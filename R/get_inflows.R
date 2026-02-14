@@ -1,49 +1,73 @@
 # Declare global variables for R CMD check
-utils::globalVariables(c(".data", "Date", "Month", "Qm", "Release"))
+utils::globalVariables(c("Date"))
 
-# Import base functions to avoid "no visible function definition" notes
-#' @importFrom utils read.csv
-#' @importFrom stats setNames
-NULL
-
-#' Get aggregated upstream inflows
+#' Get aggregated upstream inflows from USGS gauges
 #'
-#' Downloads daily discharge from one or more upstream USGS gauges and
-#' aggregates them into a single upstream inflow time series.
+#' Downloads daily discharge data from one or more upstream USGS gauges and
+#' aggregates them into a single daily upstream inflow time series over a
+#' user-defined period.
 #'
-#' @param sites Character vector of USGS site numbers (one or more)
-#' @param start_date Start date (YYYY-MM-DD)
-#' @param end_date End date (YYYY-MM-DD)
-#' @param units Output units ("m3s" or "cfs")
-#' @param na_rm Logical; remove NA values when aggregating
+#' @param sites Character vector of USGS site numbers (e.g., "02087183").
+#'   One or more gauges may be provided.
+#' @param start_date Start date (YYYY-MM-DD).
+#' @param end_date End date (YYYY-MM-DD).
+#' @param units Output units. Either `"m3s"` (default) or `"cfs"`.
+#' @param na_rm Logical; if TRUE (default), missing values are ignored when
+#'   summing multiple tributaries.
 #'
 #' @details
-#' Daily upstream inflows are computed as the sum of all available upstream
-#' tributary discharges, obtained from USGS daily-value gauges. When multiple
-#' tributaries exist, inflows are aggregated by date to form a single composite
-#' upstream inflow time series. If only one gauge is provided, the inflow equals
-#' the discharge at that gauge.
+#' Daily upstream inflows are computed as the sum of all available tributary
+#' discharges obtained from USGS daily-value gauges (parameter code 00060).
+#' When multiple gauges are supplied, flows are merged by date and summed to
+#' produce a composite upstream inflow series.
 #'
-#' @return Data frame with columns Date and Q_upstream
+#' @return A data frame with columns:
+#' \describe{
+#'   \item{Date}{Date}
+#'   \item{Q_upstream}{Daily upstream inflow in requested units}
+#' }
+#'
 #' @export
+#'
 #' @examples
-#' elev_file <- system.file("extdata", "Falls_Lake_Dam_Elevation.csv", package = "WaDorule")
-#' storage_df <- wad_compute_target_storage(
-#'   elev_df = read.csv(elev_file),
-#'   min_storage_acft = 50000,
-#'   max_storage_acft = 200000
+#' \dontrun{
+#' qin <- wad_get_upstream_inflows(
+#'   sites = c("02087183", "02087275"),
+#'   start_date = "1990-01-01",
+#'   end_date   = "2020-12-31",
+#'   units = "m3s"
 #' )
-
+#' }
 wad_get_upstream_inflows <- function(
     sites,
     start_date,
     end_date,
-    units = "m3s",
+    units = c("m3s", "cfs"),
     na_rm = TRUE
 ) {
 
-  stopifnot(is.character(sites), length(sites) >= 1)
+  ## ---- input validation ----
+  stopifnot(
+    is.character(sites),
+    length(sites) >= 1,
+    is.character(start_date),
+    is.character(end_date)
+  )
 
+  units <- match.arg(units)
+
+  start_date <- as.Date(start_date)
+  end_date   <- as.Date(end_date)
+
+  if (is.na(start_date) || is.na(end_date)) {
+    stop("start_date and end_date must be valid dates in 'YYYY-MM-DD' format.")
+  }
+
+  if (start_date > end_date) {
+    stop("start_date must be earlier than or equal to end_date.")
+  }
+
+  ## ---- download inflows ----
   inflows <- lapply(sites, function(site) {
 
     df <- dataRetrieval::readNWISdv(
@@ -53,33 +77,35 @@ wad_get_upstream_inflows <- function(
       endDate     = end_date
     )
 
-    # Keep only numeric discharge column (drop *_cd qualifier columns)
+    if (nrow(df) == 0) {
+      stop("No data returned for site ", site)
+    }
+
+    # Identify numeric discharge column (exclude qualifier columns)
     qcol <- grep("^X_[0-9]+_[0-9]+$", names(df), value = TRUE)
 
     if (length(qcol) != 1) {
       stop("Could not uniquely identify discharge column for site ", site)
     }
 
-    df <- df[, c("Date", qcol)]
-    names(df)[2] <- site
-    df
+    out <- df[, c("Date", qcol)]
+    names(out)[2] <- site
+    out
   })
 
-  # Merge all tributaries by Date
+  ## ---- merge and aggregate ----
   merged <- Reduce(
     function(x, y) merge(x, y, by = "Date", all = TRUE),
     inflows
   )
 
-  # Force numeric (safety)
   merged[-1] <- lapply(merged[-1], as.numeric)
 
-  # Unit conversion
+  # Unit conversion (USGS data are in cfs)
   if (units == "m3s") {
     merged[-1] <- merged[-1] * 0.0283168
   }
 
-  # Sum all tributaries → single upstream inflow
   merged$Q_upstream <- rowSums(merged[-1], na.rm = na_rm)
 
   merged[, c("Date", "Q_upstream")]

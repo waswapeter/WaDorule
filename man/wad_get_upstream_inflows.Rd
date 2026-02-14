@@ -2,46 +2,54 @@
 % Please edit documentation in R/get_inflows.R
 \name{wad_get_upstream_inflows}
 \alias{wad_get_upstream_inflows}
-\title{Get aggregated upstream inflows}
+\title{Get aggregated upstream inflows from USGS gauges}
 \usage{
 wad_get_upstream_inflows(
   sites,
   start_date,
   end_date,
-  units = "m3s",
+  units = c("m3s", "cfs"),
   na_rm = TRUE
 )
 }
 \arguments{
-\item{sites}{Character vector of USGS site numbers (one or more)}
+\item{sites}{Character vector of USGS site numbers (e.g., "02087183").
+One or more gauges may be provided.}
 
-\item{start_date}{Start date (YYYY-MM-DD)}
+\item{start_date}{Start date (YYYY-MM-DD).}
 
-\item{end_date}{End date (YYYY-MM-DD)}
+\item{end_date}{End date (YYYY-MM-DD).}
 
-\item{units}{Output units ("m3s" or "cfs")}
+\item{units}{Output units. Either `"m3s"` (default) or `"cfs"`.}
 
-\item{na_rm}{Logical; remove NA values when aggregating}
+\item{na_rm}{Logical; if TRUE (default), missing values are ignored when
+summing multiple tributaries.}
 }
 \value{
-Data frame with columns Date and Q_upstream
+A data frame with columns:
+\describe{
+  \item{Date}{Date}
+  \item{Q_upstream}{Daily upstream inflow in requested units}
+}
 }
 \description{
-Downloads daily discharge from one or more upstream USGS gauges and
-aggregates them into a single upstream inflow time series.
+Downloads daily discharge data from one or more upstream USGS gauges and
+aggregates them into a single daily upstream inflow time series over a
+user-defined period.
 }
 \details{
-Daily upstream inflows are computed as the sum of all available upstream
-tributary discharges, obtained from USGS daily-value gauges. When multiple
-tributaries exist, inflows are aggregated by date to form a single composite
-upstream inflow time series. If only one gauge is provided, the inflow equals
-the discharge at that gauge.
+Daily upstream inflows are computed as the sum of all available tributary
+discharges obtained from USGS daily-value gauges (parameter code 00060).
+When multiple gauges are supplied, flows are merged by date and summed to
+produce a composite upstream inflow series.
 }
 \examples{
-elev_file <- system.file("extdata", "Falls_Lake_Dam_Elevation.csv", package = "WaDorule")
-storage_df <- wad_compute_target_storage(
-  elev_df = read.csv(elev_file),
-  min_storage_acft = 50000,
-  max_storage_acft = 200000
+\dontrun{
+qin <- wad_get_upstream_inflows(
+  sites = c("02087183", "02087275"),
+  start_date = "1990-01-01",
+  end_date   = "2020-12-31",
+  units = "m3s"
 )
+}
 }
