@@ -1,0 +1,26 @@
+Package: WaDorule
+Title: Derived State Dependent Reservoir Release Policies
+Version: 0.1.0
+Authors@R: 
+    person(
+     given = "Peter",
+     family ="Wasswa", 
+     email = "waswapeter4@gmail.com", 
+     role = c("aut", "cre"))
+Description: Implements the WaDorule algorithm for reservoir release
+    policy estimation using rule curves and seasonal inflow weighting together with constraints.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports:
+    dplyr,
+    lubridate,
+    dataRetrieval,
+    ggplot2
+RoxygenNote: 7.3.3
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3

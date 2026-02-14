@@ -1,0 +1,32 @@
+---
+title: "wadodule-workflow"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{wadodule-workflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(WaDorule)
+
+```
+## Upstream inflow aggregation
+
+WaDorule computes reservoir inflows using daily discharge records from upstream tributary gauges. All available tributary inflows are aggregated by date to form a single composite upstream inflow time series:
+
+\[
+Q_{\text{upstream}}(t) = \sum_{i=1}^{N} Q_i(t)
+\]
+
+where \( Q_i(t) \) denotes the daily discharge at tributary \( i \), and \( N \) is the number of upstream gauges. When only one upstream gauge is available, the inflow time series equals the discharge at that gauge.
+
+This approach ensures hydrologic consistency and allows WaDorule to be applied uniformly across reservoirs with varying numbers of upstream tributaries.
+
