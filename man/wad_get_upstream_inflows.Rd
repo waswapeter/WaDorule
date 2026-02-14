@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_inflows.R
 \name{wad_get_upstream_inflows}
 \alias{wad_get_upstream_inflows}
-\title{Get aggregated upstream inflows from USGS gauges}
+\title{Get aggregated upstream inflows from USGS gauges (daily)}
 \usage{
 wad_get_upstream_inflows(
   sites,
@@ -16,21 +16,19 @@ wad_get_upstream_inflows(
 \item{sites}{Character vector of USGS site numbers (e.g., "02087183").
 One or more gauges may be provided.}
 
-\item{start_date}{Start date (YYYY-MM-DD).}
+\item{start_date}{Start date (YYYY-MM-DD)}
 
-\item{end_date}{End date (YYYY-MM-DD).}
+\item{end_date}{End date (YYYY-MM-DD)}
 
-\item{units}{Output units. Either `"m3s"` (default) or `"cfs"`.}
+\item{units}{Output units. Either "m3s" (default) or "cfs"}
 
 \item{na_rm}{Logical; if TRUE (default), missing values are ignored when
-summing multiple tributaries.}
+summing multiple tributaries}
 }
 \value{
 A data frame with columns:
-\describe{
-  \item{Date}{Date}
-  \item{Q_upstream}{Daily upstream inflow in requested units}
-}
+  - Date: Date
+  - Q_upstream: Daily upstream inflow in requested units
 }
 \description{
 Downloads daily discharge data from one or more upstream USGS gauges and
