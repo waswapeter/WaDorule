@@ -13,8 +13,7 @@ wad_get_upstream_inflows(
 )
 }
 \arguments{
-\item{sites}{Character vector of USGS site numbers (e.g., "02087183").
-One or more gauges may be provided.}
+\item{sites}{Character vector of USGS site numbers (e.g., "02087183").}
 
 \item{start_date}{Start date (YYYY-MM-DD)}
 
@@ -34,12 +33,6 @@ A data frame with columns:
 Downloads daily discharge data from one or more upstream USGS gauges and
 aggregates them into a single daily upstream inflow time series over a
 user-defined period.
-}
-\details{
-Daily upstream inflows are computed as the sum of all available tributary
-discharges obtained from USGS daily-value gauges (parameter code 00060).
-When multiple gauges are supplied, flows are merged by date and summed to
-produce a composite upstream inflow series.
 }
 \examples{
 \dontrun{

@@ -1,34 +1,20 @@
-
-# Declare global variables for R CMD check
-utils::globalVariables(c("Date","Release"))
-
-# Import base functions to avoid "no visible function definition" notes
-#' @importFrom utils read.csv
-#' @importFrom stats setNames
-NULL
-
 #' WaDorule release policy with optional release plot
 #'
 #' Computes daily releases from a storage rule curve and monthly seasonal weights.
 #'
-#' @param df Data frame with Date and Storage (MCM)
-#' @param seasonal_weights Named vector of monthly inflow weights
+#' @param df Data frame with columns:
+#'   - Date (class Date)
+#'   - Storage (numeric, in MCM)
+#' @param seasonal_weights Named numeric vector of 12 monthly weights (Jan–Dec)
 #' @param Smin Minimum storage (MCM)
 #' @param Smax Maximum storage (MCM)
 #' @param Qmin Minimum release (m3/s)
 #' @param Qmax Maximum release (m3/s)
-#' @param rule linear or logistic
+#' @param rule Character; either "linear" or "logistic"
 #' @param plot Logical; if TRUE, generates a daily release plot
-#' @return Data frame with Date, Storage, Month, Release
-#' #' #' @examples
-#' elev_file <- system.file("extdata", "Falls_Lake_Dam_Elevation.csv", package = "WaDorule")
-#' storage_df <- wad_compute_target_storage(
-#'   elev_df = read.csv(elev_file),
-#'   min_storage_acft = 50000,
-#'   max_storage_acft = 200000
-#' )
+#' @return Data frame with columns: Date, Storage, Month, Release
+#' @importFrom rlang .data
 #' @export
-
 wad_release_policy <- function(
     df,
     seasonal_weights,
@@ -36,51 +22,61 @@ wad_release_policy <- function(
     Smax,
     Qmin,
     Qmax,
-    rule = "linear",
+    rule = c("linear", "logistic"),
     plot = FALSE
 ) {
 
-  # Check inputs
-  stopifnot(all(c("Date", "Storage") %in% names(df)))
-  stopifnot(is.numeric(Smin), is.numeric(Smax), Smin < Smax)
-  stopifnot(is.numeric(Qmin), is.numeric(Qmax), Qmin <= Qmax)
-  stopifnot(rule %in% c("linear", "logistic"))
+  ## ---- Input validation ----
+  stopifnot(
+    inherits(df$Date, "Date"),
+    is.numeric(df$Storage),
+    length(seasonal_weights) == 12,
+    all(month.abb %in% names(seasonal_weights)),
+    Smin < Smax,
+    Qmin <= Qmax
+  )
 
-  # Add Month column
+  rule <- match.arg(rule)
+
+  # Ensure numeric storage
+  df$Storage <- as.numeric(df$Storage)
+
+  # Extract month abbreviation
   df$Month <- format(df$Date, "%b")
 
-  # Compute storage index (0–1)
+  # Normalize storage to 0–1
   S_idx <- pmin(1, pmax(0, (df$Storage - Smin) / (Smax - Smin)))
 
-  # Compute release fraction
+  # Compute fractional release
   rel_frac <- if (rule == "logistic") {
     1 / (1 + exp(-8 * (S_idx - 0.55)))
   } else {
     S_idx
   }
 
-  # Compute daily release
-  df$Release <- (Qmin + rel_frac * (Qmax - Qmin)) * seasonal_weights[df$Month]
+  # Apply seasonal weights; fallback to 1 if missing
+  weights <- seasonal_weights[df$Month]
+  weights[is.na(weights)] <- 1
 
-  # Optional plot: daily release
+  df$Release <- (Qmin + rel_frac * (Qmax - Qmin)) * weights
+
+  ## ---- Optional plot ----
   if (plot) {
-    if (!requireNamespace("ggplot2", quietly = TRUE)) {
-      warning("ggplot2 required for plotting. Install it with install.packages('ggplot2')")
-    } else {
-      p <- ggplot2::ggplot(df, ggplot2::aes(x = Date, y = Release)) +
+    if (requireNamespace("ggplot2", quietly = TRUE)) {
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$Date, y = .data$Release)) +
         ggplot2::geom_line(color = "steelblue", linewidth = 1) +
+        ggplot2::theme_minimal() +
         ggplot2::labs(
-          title = "Daily Release from WaDorule Policy",
+          title = "Daily Reservoir Release",
           x = "Date",
           y = "Release (m3/s)"
-        ) +
-        ggplot2::theme_minimal()
-
-      print(p)  # force plot to display inside function
+        )
+      print(p)
+    } else {
+      warning("Install ggplot2 to generate plot", call. = FALSE)
     }
   }
 
-  return(df)
+  # Return only relevant columns
+  df[, c("Date", "Storage", "Month", "Release")]
 }
-
-

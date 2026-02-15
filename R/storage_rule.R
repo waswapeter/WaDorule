@@ -1,16 +1,15 @@
-
-# Import base functions to avoid "no visible function definition" notes
-#' @importFrom utils read.csv
-#' @importFrom stats setNames
-NULL
-
-#' Compute target storage from elevation rule curve
+#' Compute target storage from elevation rule curve or daily CSV
 #'
-#' @param elev_df Data frame with Target_Elev (ft), optional
+#' Converts elevation (ft) to storage (MCM). Accepts user daily CSV (365/366 rows)
+#' or package default elevation curve.
+#'
+#' @param elev_df Data frame with column `Target_Elev` (optional)
 #' @param min_storage_acft Minimum conservation storage (ac-ft)
 #' @param max_storage_acft Maximum conservation storage (ac-ft)
 #' @param elev_file Optional path to user elevation CSV (overrides default)
-#' @return Data frame with target storage (MCM)
+#' @return Data frame with columns:
+#'   - Target_Elev (ft)
+#'   - target_storage_MCM (MCM)
 #' @export
 wad_compute_target_storage <- function(
     elev_df = NULL,
@@ -19,13 +18,13 @@ wad_compute_target_storage <- function(
     elev_file = NULL
 ) {
 
-  # 1️⃣ User CSV overrides everything
+  ## ---- 1️⃣ Load CSV if provided ----
   if (!is.null(elev_file)) {
     if (!file.exists(elev_file)) stop("User CSV file not found: ", elev_file)
-    elev_df <- read.csv(elev_file)
+    elev_df <- utils::read.csv(elev_file)
   }
 
-  # 2️⃣ If elev_df is still NULL, use package default CSV
+  ## ---- 2️⃣ Use package default CSV if elev_df still NULL ----
   if (is.null(elev_df)) {
     default_csv <- system.file(
       "extdata",
@@ -33,22 +32,42 @@ wad_compute_target_storage <- function(
       package = "WaDorule"
     )
     if (default_csv == "") stop("Default elevation CSV not found in package")
-    elev_df <- read.csv(default_csv)
+    elev_df <- utils::read.csv(default_csv)
   }
 
-  # 3️⃣ Sanity check
+  ## ---- 3️⃣ Sanity checks ----
   stopifnot("Target_Elev" %in% names(elev_df))
+  if (!is.numeric(elev_df$Target_Elev)) elev_df$Target_Elev <- as.numeric(elev_df$Target_Elev)
 
-  # Linear mapping elevation → storage
-  min_elev <- min(elev_df$Target_Elev, na.rm = TRUE)
-  max_elev <- max(elev_df$Target_Elev, na.rm = TRUE)
+  n_rows <- nrow(elev_df)
 
-  stor <- (elev_df$Target_Elev - min_elev) /
-    (max_elev - min_elev) *
-    (max_storage_acft - min_storage_acft) +
-    min_storage_acft
+  ## ---- 4️⃣ Map elevation → storage ----
+  if (n_rows %in% c(365, 366)) {
+    # User-supplied daily CSV: map min/max storage to min/max Target_Elev
+    min_elev <- min(elev_df$Target_Elev, na.rm = TRUE)
+    max_elev <- max(elev_df$Target_Elev, na.rm = TRUE)
+    if (min_elev == max_elev) stop("Min and max elevations are equal; cannot map to storage.")
 
+    stor <- (elev_df$Target_Elev - min_elev) /
+      (max_elev - min_elev) *
+      (max_storage_acft - min_storage_acft) +
+      min_storage_acft
+
+  } else {
+    # Standard curve: assume sorted Target_Elev for linear mapping
+    min_elev <- min(elev_df$Target_Elev, na.rm = TRUE)
+    max_elev <- max(elev_df$Target_Elev, na.rm = TRUE)
+    if (min_elev == max_elev) stop("Min and max elevations are equal; cannot map to storage.")
+
+    stor <- (elev_df$Target_Elev - min_elev) /
+      (max_elev - min_elev) *
+      (max_storage_acft - min_storage_acft) +
+      min_storage_acft
+  }
+
+  ## ---- 5️⃣ Convert ac-ft → MCM ----
   elev_df$target_storage_MCM <- stor * 0.00123348
 
-  return(elev_df)
+  ## ---- 6️⃣ Return only relevant columns ----
+  elev_df[, c("Target_Elev", "target_storage_MCM")]
 }

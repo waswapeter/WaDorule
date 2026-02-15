@@ -16,11 +16,12 @@ Imports:
     dplyr,
     lubridate,
     dataRetrieval,
-    ggplot2
-RoxygenNote: 7.3.3
-Suggests: 
+    rlang
+Suggests:
+    ggplot2,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)
+RoxygenNote: 7.3.3
 VignetteBuilder: knitr
 Config/testthat/edition: 3

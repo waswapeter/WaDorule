@@ -7,20 +7,20 @@
 wad_seasonal_weights(inflow_df, inflow_col = "Q_upstream")
 }
 \arguments{
-\item{inflow_df}{Data frame with Date and inflow}
+\item{inflow_df}{Data frame with Date and inflow column}
 
-\item{inflow_col}{Column name of inflow}
+\item{inflow_col}{Name of inflow column (default "Q_upstream")}
 }
 \value{
-Named vector of monthly weights
-#' @examples
-elev_file <- system.file("extdata", "Falls_Lake_Dam_Elevation.csv", package = "WaDorule")
-storage_df <- wad_compute_target_storage(
-  elev_df = read.csv(elev_file),
-  min_storage_acft = 50000,
-  max_storage_acft = 200000
-)
+Named numeric vector of 12 monthly seasonal weights
 }
 \description{
-Compute seasonal inflow weights
+Computes relative monthly inflow weights from daily discharge data.
+}
+\examples{
+inflow_df <- data.frame(
+  Date = seq(as.Date("2020-01-01"), by = "day", length.out = 365),
+  Q_upstream = runif(365, 50, 200)
+)
+wad_seasonal_weights(inflow_df)
 }

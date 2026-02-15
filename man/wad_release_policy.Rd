@@ -11,14 +11,16 @@ wad_release_policy(
   Smax,
   Qmin,
   Qmax,
-  rule = "linear",
+  rule = c("linear", "logistic"),
   plot = FALSE
 )
 }
 \arguments{
-\item{df}{Data frame with Date and Storage (MCM)}
+\item{df}{Data frame with columns:
+- Date (class Date)
+- Storage (numeric, in MCM)}
 
-\item{seasonal_weights}{Named vector of monthly inflow weights}
+\item{seasonal_weights}{Named numeric vector of 12 monthly weights (Jan–Dec)}
 
 \item{Smin}{Minimum storage (MCM)}
 
@@ -28,19 +30,12 @@ wad_release_policy(
 
 \item{Qmax}{Maximum release (m3/s)}
 
-\item{rule}{linear or logistic}
+\item{rule}{Character; either "linear" or "logistic"}
 
 \item{plot}{Logical; if TRUE, generates a daily release plot}
 }
 \value{
-Data frame with Date, Storage, Month, Release
-#' #' @examples
-elev_file <- system.file("extdata", "Falls_Lake_Dam_Elevation.csv", package = "WaDorule")
-storage_df <- wad_compute_target_storage(
-  elev_df = read.csv(elev_file),
-  min_storage_acft = 50000,
-  max_storage_acft = 200000
-)
+Data frame with columns: Date, Storage, Month, Release
 }
 \description{
 Computes daily releases from a storage rule curve and monthly seasonal weights.

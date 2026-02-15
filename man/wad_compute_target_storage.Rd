@@ -2,7 +2,7 @@
 % Please edit documentation in R/storage_rule.R
 \name{wad_compute_target_storage}
 \alias{wad_compute_target_storage}
-\title{Compute target storage from elevation rule curve}
+\title{Compute target storage from elevation rule curve or daily CSV}
 \usage{
 wad_compute_target_storage(
   elev_df = NULL,
@@ -12,7 +12,7 @@ wad_compute_target_storage(
 )
 }
 \arguments{
-\item{elev_df}{Data frame with Target_Elev (ft), optional}
+\item{elev_df}{Data frame with column `Target_Elev` (optional)}
 
 \item{min_storage_acft}{Minimum conservation storage (ac-ft)}
 
@@ -21,8 +21,11 @@ wad_compute_target_storage(
 \item{elev_file}{Optional path to user elevation CSV (overrides default)}
 }
 \value{
-Data frame with target storage (MCM)
+Data frame with columns:
+  - Target_Elev (ft)
+  - target_storage_MCM (MCM)
 }
 \description{
-Compute target storage from elevation rule curve
+Converts elevation (ft) to storage (MCM). Accepts user daily CSV (365/366 rows)
+or package default elevation curve.
 }
