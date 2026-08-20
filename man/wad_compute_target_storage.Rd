@@ -2,30 +2,67 @@
 % Please edit documentation in R/storage_rule.R
 \name{wad_compute_target_storage}
 \alias{wad_compute_target_storage}
-\title{Compute target storage from elevation rule curve or daily CSV}
+\title{Compute target storage from an elevation or storage rule curve}
 \usage{
 wad_compute_target_storage(
   elev_df = NULL,
-  min_storage_acft,
-  max_storage_acft,
-  elev_file = NULL
+  min_storage_acft = NULL,
+  max_storage_acft = NULL,
+  elev_file = NULL,
+  min_elev_ft = NULL,
+  max_elev_ft = NULL,
+  date_col = NULL
 )
 }
 \arguments{
-\item{elev_df}{Data frame with column `Target_Elev` (optional)}
+\item{elev_df}{Optional data frame containing user-supplied elevation and/or
+storage data. Either `elev_df` or `elev_file` must be supplied.}
 
-\item{min_storage_acft}{Minimum conservation storage (ac-ft)}
+\item{min_storage_acft}{Minimum operational or conservation storage in
+acre-feet. Required when storage is calculated from elevation.}
 
-\item{max_storage_acft}{Maximum conservation storage (ac-ft)}
+\item{max_storage_acft}{Maximum operational or conservation storage in
+acre-feet. Required when storage is calculated from elevation.}
 
-\item{elev_file}{Optional path to user elevation CSV (overrides default)}
+\item{elev_file}{Optional path to a user-supplied CSV file. If supplied, it
+takes precedence over `elev_df`.}
+
+\item{min_elev_ft}{Minimum operational elevation in feet. If NULL, the
+minimum elevation in the input data is used.}
+
+\item{max_elev_ft}{Maximum operational elevation in feet. If NULL, the
+maximum elevation in the input data is used.}
+
+\item{date_col}{Optional name of the date column. Common names such as
+`Date`, `date`, or `datetime` are detected automatically if this is NULL.}
 }
 \value{
-Data frame with columns:
-  - Target_Elev (ft)
-  - target_storage_MCM (MCM)
+A data frame containing `Date`, if supplied, `Target_Elev`, if
+  supplied, and `target_storage_MCM`.
 }
 \description{
-Converts elevation (ft) to storage (MCM). Accepts user daily CSV (365/366 rows)
-or package default elevation curve.
+Uses a user-supplied daily elevation rule, a user-supplied daily storage
+rule, or both. If storage data are supplied, they are used directly. If
+storage data are not supplied, storage is calculated from elevation using
+user-supplied storage and elevation limits.
+}
+\details{
+No default reservoir elevation or storage curve is used. Each reservoir must
+provide its own data.
+
+
+The function recognizes the following storage columns:
+
+\describe{
+  \item{MCM storage}{
+    \code{target_storage_MCM}, \code{Target_Storage_MCM},
+    \code{storage_MCM}, or \code{Storage_MCM}.
+  }
+  \item{Acre-feet storage}{
+    \code{target_storage_acft}, \code{Target_Storage_acft},
+    \code{storage_acft}, \code{Storage_acft}, or \code{Storage}.
+  }
+}
+
+One acre-foot equals approximately 0.00123348 million cubic metres (MCM).
 }

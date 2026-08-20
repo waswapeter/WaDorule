@@ -1,2 +1,8 @@
 .Rproj.user
 inst/doc
+.positai
+output/
+.Rhistory
+.Rproj.user/
+.Rhistory
+.Rproj.user/

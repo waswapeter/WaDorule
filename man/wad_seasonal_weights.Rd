@@ -4,23 +4,68 @@
 \alias{wad_seasonal_weights}
 \title{Compute seasonal inflow weights}
 \usage{
-wad_seasonal_weights(inflow_df, inflow_col = "Q_upstream")
+wad_seasonal_weights(
+  inflow_df,
+  inflow_col = "Q_upstream",
+  date_col = "Date",
+  missing_month = c("zero", "error"),
+  na_rm = TRUE
+)
 }
 \arguments{
-\item{inflow_df}{Data frame with Date and inflow column}
+\item{inflow_df}{Data frame containing daily inflow data.}
 
-\item{inflow_col}{Name of inflow column (default "Q_upstream")}
+\item{inflow_col}{Name of the inflow column. Default is `"Q_upstream"`.}
+
+\item{date_col}{Name of the date column. Default is `"Date"`.}
+
+\item{missing_month}{How to handle a month with no valid inflow data.
+`"zero"` assigns a weight of zero. `"error"` stops the function.}
+
+\item{na_rm}{Logical. If TRUE, missing inflow values are ignored when
+calculating monthly means.}
 }
 \value{
-Named numeric vector of 12 monthly seasonal weights
+A named numeric vector of 12 monthly seasonal weights. The names are
+  the standard three-letter month abbreviations from `month.abb`.
 }
 \description{
 Computes relative monthly inflow weights from daily discharge data.
+The average weight across the 12 calendar months is normalized to 1.
+}
+\details{
+The function is provider-independent and can use inflow data from USGS,
+CDEC, or any other country or data source, provided the input contains a
+date column and an inflow column.
+
+
+For each month, the function calculates the mean daily inflow:
+
+\deqn{
+Q_m = mean(daily\ inflow\ for\ month\ m)
+}
+
+The seasonal weight is then calculated as:
+
+\deqn{
+w_m = Q_m / mean(Q_1, ..., Q_{12})
+}
+
+Therefore, the mean of the 12 monthly weights is 1. A weight greater than 1
+represents a month with above-average inflow, while a weight less than 1
+represents a month with below-average inflow.
 }
 \examples{
+\dontrun{
 inflow_df <- data.frame(
-  Date = seq(as.Date("2020-01-01"), by = "day", length.out = 365),
-  Q_upstream = runif(365, 50, 200)
+  Date = seq(
+    as.Date("2020-01-01"),
+    as.Date("2020-12-31"),
+    by = "day"
+  ),
+  Q_upstream = runif(366, 50, 200)
 )
+
 wad_seasonal_weights(inflow_df)
+}
 }

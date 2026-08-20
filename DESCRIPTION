@@ -1,27 +1,40 @@
 Package: WaDorule
-Title: Derived State Dependent Reservoir Release Policies
+Title: Derived State-Dependent Reservoir Release Policies
 Version: 0.1.0
-Authors@R: 
-    person(
-     given = "Peter",
-     family ="Wasswa", 
-     email = "waswapeter4@gmail.com", 
-     role = c("aut", "cre"))
-Description: Implements the WaDorule algorithm for reservoir release
-    policy estimation using rule curves and seasonal inflow weighting together with constraints.
+Authors@R:
+    c(
+        person(
+            given = "Peter",
+            family = "Wasswa",
+            email = "waswapeter4@gmail.com",
+            role = c("aut", "cre")
+        ),
+        person(
+            given = "Martin",
+            family = "Doyle",
+            role = "ctb",
+            comment = "Supervisor"
+        )
+    )
+Description: Provides tools for estimating state-dependent reservoir release
+    policies using reservoir storage or elevation rule curves, seasonal
+    inflow weighting, and user-defined operational constraints. The package
+    supports inflow data from USGS and CDEC gages, as well as user-supplied
+    data from other countries and data providers.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
+Depends:
+    R (>= 4.1.0)
 Imports:
-    dplyr,
-    lubridate,
-    dataRetrieval,
-    rlang
+    dataRetrieval
 Suggests:
+    CDECRetrieve,
     ggplot2,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)
-RoxygenNote: 7.3.3
 VignetteBuilder: knitr
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
+

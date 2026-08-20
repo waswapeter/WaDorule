@@ -2,10 +2,22 @@
 % Please edit documentation in R/get_inflows.R
 \name{wad_get_upstream_inflows}
 \alias{wad_get_upstream_inflows}
-\title{Get aggregated upstream inflows from USGS gauges (daily)}
+\title{Aggregate upstream inflows from USGS, CDEC, and user-defined gages}
 \usage{
 wad_get_upstream_inflows(
-  sites,
+  usgs_sites = NULL,
+  cdec_sites = NULL,
+  cdec_sensor = "76",
+  cdec_dur_code = "D",
+  cdec_units = c("cfs", "m3s"),
+  inflow_data = NULL,
+  user_flow_cols = NULL,
+  inflow_units = c("cfs", "m3s"),
+  other_data = NULL,
+  other_flow_cols = NULL,
+  other_units = c("cfs", "m3s"),
+  other_sites = NULL,
+  other_reader = NULL,
   start_date,
   end_date,
   units = c("m3s", "cfs"),
@@ -13,33 +25,101 @@ wad_get_upstream_inflows(
 )
 }
 \arguments{
-\item{sites}{Character vector of USGS site numbers (e.g., "02087183").}
+\item{usgs_sites}{Character vector of USGS site numbers.}
 
-\item{start_date}{Start date (YYYY-MM-DD)}
+\item{cdec_sites}{Character vector of CDEC station codes.}
 
-\item{end_date}{End date (YYYY-MM-DD)}
+\item{cdec_sensor}{CDEC sensor code. Default is `"76"`.}
 
-\item{units}{Output units. Either "m3s" (default) or "cfs"}
+\item{cdec_dur_code}{CDEC duration code. Default is `"D"` for daily data.}
 
-\item{na_rm}{Logical; if TRUE (default), missing values are ignored when
-summing multiple tributaries}
+\item{cdec_units}{Units of the CDEC data. Either `"cfs"` or `"m3s"`.}
+
+\item{inflow_data}{Optional data frame containing user-provided gage data.
+It must contain a `Date` column and one or more flow columns.}
+
+\item{user_flow_cols}{Optional character vector identifying the flow columns
+in `inflow_data`. If NULL, all numeric columns except `Date` are used.}
+
+\item{inflow_units}{Units of `inflow_data`. Either `"cfs"` or `"m3s"`.}
+
+\item{other_data}{Optional data frame containing non-US or international
+gage data. It must contain a `Date` column and one or more flow columns.}
+
+\item{other_flow_cols}{Optional character vector identifying the flow
+columns in `other_data`. If NULL, all numeric columns except `Date` are
+used.}
+
+\item{other_units}{Units of `other_data`. Either `"cfs"` or `"m3s"`.}
+
+\item{other_sites}{Optional character vector of non-US gage or station
+identifiers. These identifiers are passed to `other_reader`.}
+
+\item{other_reader}{Optional user-defined function for downloading data from
+another country or data provider. The function must accept the arguments
+`site`, `start_date`, and `end_date`, and must return a data frame with a
+`Date` column and one or more numeric flow columns.}
+
+\item{start_date}{Start date in `"YYYY-MM-DD"` format.}
+
+\item{end_date}{End date in `"YYYY-MM-DD"` format.}
+
+\item{units}{Output units. Either `"m3s"` or `"cfs"`.}
+
+\item{na_rm}{Logical. If TRUE, missing values are ignored when summing gages.
+If FALSE, a missing value from any source causes the daily total to be NA.}
 }
 \value{
-A data frame with columns:
-  - Date: Date
-  - Q_upstream: Daily upstream inflow in requested units
+A data frame with two columns:
+  \describe{
+    \item{Date}{Date of the inflow record.}
+    \item{Q_upstream}{Aggregated upstream inflow.}
+  }
 }
 \description{
-Downloads daily discharge data from one or more upstream USGS gauges and
-aggregates them into a single daily upstream inflow time series over a
-user-defined period.
+Downloads daily discharge data from one or more USGS and/or CDEC gages,
+combines these data with user-supplied inflow data, and returns one daily
+aggregated upstream inflow time series.
+}
+\details{
+User-defined data can represent gages from any country. International data
+can either be supplied directly as a data frame or downloaded through a
+user-defined reader function.
 }
 \examples{
 \dontrun{
+# USGS gages
 qin <- wad_get_upstream_inflows(
-  sites = c("02087183", "02087275"),
-  start_date = "1990-01-01",
-  end_date   = "2020-12-31",
+  usgs_sites = c("12175500", "12178100"),
+  start_date = "2000-01-01",
+  end_date = "2020-12-31",
+  units = "m3s"
+)
+
+# CDEC gages
+qin <- wad_get_upstream_inflows(
+  cdec_sites = c("ISB", "ABC"),
+  cdec_sensor = "76",
+  cdec_dur_code = "D",
+  cdec_units = "cfs",
+  start_date = "1994-01-01",
+  end_date = "2020-12-31",
+  units = "m3s"
+)
+
+# Multiple user-provided gages
+user_data <- data.frame(
+  Date = as.Date(c("2020-01-01", "2020-01-02")),
+  Gage_A = c(100, 125),
+  Gage_B = c(50, 75)
+)
+
+qin <- wad_get_upstream_inflows(
+  inflow_data = user_data,
+  user_flow_cols = c("Gage_A", "Gage_B"),
+  inflow_units = "cfs",
+  start_date = "2020-01-01",
+  end_date = "2020-01-02",
   units = "m3s"
 )
 }
