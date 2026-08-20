@@ -1,0 +1,856 @@
+---
+title: "WaDorule User Guide"
+author: "Peter Wasswa"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{WaDorule User Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+# Overview
+
+This vignette demonstrates how to use WaDorule to:
+
+- obtain upstream inflows from USGS or CDEC gages;
+- combine multiple gages;
+- use user-supplied inflow data from any country;
+- compute or import reservoir storage rules;
+- calculate seasonal inflow weights;
+- apply linear or logistic release policies; and
+- save results locally.
+
+## Complete workflow
+
+The following script is ready to use. Edit only the section labelled
+`USER SETTINGS`.
+
+```{r, eval=FALSE}
+###############################################################################
+# WaDorule User Workflow
+#
+# This script demonstrates the complete WaDorule workflow:
+#
+#   1. Install and load WaDorule
+#   2. Select an inflow source:
+#        - USGS gages
+#        - CDEC gages
+#        - User-provided gages
+#        - International/non-US gages
+#   3. Compute or import a reservoir storage rule
+#   4. Calculate seasonal inflow weights
+#   5. Apply a linear or logistic release policy
+#   6. Save outputs locally
+#   7. Create optional plots
+#
+# IMPORTANT:
+# - Each reservoir must provide its own storage and elevation information.
+# - WaDorule does not use a default reservoir elevation curve.
+# - Storage used by wad_release_policy() must be in MCM.
+# - Flow and release values in this example are in m3/s.
+# - Elevation values in this example are in m.
+###############################################################################
+
+
+###############################################################################
+# 1. INSTALL AND LOAD WADORULE
+###############################################################################
+
+# Install the exact released version used in the study:
+#
+# install.packages("remotes")
+# remotes::install_github(
+#   "waswapeter/WaDorule",
+#   ref = "v0.1.0",
+#   upgrade = "never"
+# )
+
+library(WaDorule)
+
+# Check the installed version
+packageVersion("WaDorule")
+
+# View exported functions
+ls("package:WaDorule")
+
+# Open function documentation if required
+# ?wad_get_upstream_inflows
+# ?wad_compute_target_storage
+# ?wad_seasonal_weights
+# ?wad_release_policy
+
+
+###############################################################################
+# 2. USER SETTINGS
+###############################################################################
+
+## ---- Date period ------------------------------------------------------------
+
+start_date <- "2000-01-01"
+end_date   <- "2020-12-31"
+
+
+## ---- Inflow source ----------------------------------------------------------
+
+# Select one of the following:
+#
+#   "usgs"
+#   "cdec"
+#   "user"
+#   "international"
+#   "combined"
+#
+inflow_source <- "usgs"
+
+
+## ---- USGS settings ----------------------------------------------------------
+
+# Enter one or more USGS site numbers.
+#
+# Example:
+# usgs_sites <- c("02087183", "02087275")
+
+usgs_sites <- c("02087183")
+
+
+## ---- CDEC settings ----------------------------------------------------------
+
+# CDEC requires the optional CDECRetrieve package.
+#
+# Install it once if needed:
+#
+# install.packages("remotes")
+# remotes::install_github("FlowWest/CDECRetrieve")
+
+# Enter one or more CDEC station codes.
+cdec_sites <- c("ISB")
+
+# CDEC sensor and duration code
+cdec_sensor   <- "76"
+cdec_dur_code <- "D"
+
+# Confirm the units returned by the selected CDEC sensor.
+# Sensor 76 is commonly reported in cfs, but users should verify this.
+cdec_units <- "cfs"
+
+
+## ---- User-provided inflow settings -----------------------------------------
+
+# For user-provided inflows, the data frame must contain:
+#
+#   Date
+#   one or more flow columns
+#
+# Example:
+#
+# user_inflows <- data.frame(
+#   Date = as.Date(c("2000-01-01", "2000-01-02")),
+#   Gage_A = c(100, 125),
+#   Gage_B = c(50, 75)
+# )
+#
+# Set user_flow_cols to the names of the columns that should be summed.
+#
+# If user_flow_cols = NULL, all numeric columns except Date are used.
+
+user_inflows <- NULL
+user_flow_cols <- NULL
+
+# Example for reading a user file:
+#
+# user_inflows <- read.csv(
+#   "C:/path/to/user_inflows.csv",
+#   stringsAsFactors = FALSE
+# )
+#
+# user_inflows$Date <- as.Date(
+#   user_inflows$Date,
+#   format = "%Y-%m-%d"
+# )
+#
+# user_flow_cols <- c("Gage_A", "Gage_B")
+
+user_inflow_units <- "cfs"
+
+
+## ---- International/non-US inflow settings -----------------------------------
+
+# International or non-US data can be supplied in exactly the same format:
+#
+#   Date
+#   one or more flow columns
+#
+# Example:
+#
+# international_inflows <- read.csv(
+#   "C:/path/to/international_gages.csv",
+#   stringsAsFactors = FALSE
+# )
+#
+# international_inflows$Date <- as.Date(
+#   international_inflows$Date,
+#   format = "%Y-%m-%d"
+# )
+#
+# international_flow_cols <- c("Gage_001", "Gage_002")
+
+international_inflows <- NULL
+international_flow_cols <- NULL
+international_units <- "m3s"
+
+# Optional non-US site identifiers and custom reader.
+#
+# A custom reader must accept:
+#
+#   site
+#   start_date
+#   end_date
+#
+# and return a data frame containing Date and one or more flow columns.
+
+international_sites <- NULL
+international_reader <- NULL
+
+# Example custom reader:
+#
+# international_reader <- function(site, start_date, end_date) {
+#
+#   file_name <- paste0(site, "_daily_flow.csv")
+#
+#   x <- read.csv(
+#     file_name,
+#     stringsAsFactors = FALSE
+#   )
+#
+#   x$Date <- as.Date(x$Date)
+#
+#   x[
+#     x$Date >= start_date &
+#       x$Date <= end_date,
+#     ,
+#     drop = FALSE
+#   ]
+# }
+
+
+## ---- Flow units -------------------------------------------------------------
+
+# Final inflow units returned by WaDorule:
+#
+#   "m3s" = cubic metres per second
+#   "cfs" = cubic feet per second
+
+inflow_output_units <- "m3s"
+
+
+## ---- Missing-data behavior --------------------------------------------------
+
+# TRUE:
+#   Missing values are ignored when summing multiple gages.
+#
+# FALSE:
+#   A missing value from any contributing source produces NA for that date.
+
+na_rm <- TRUE
+
+
+###############################################################################
+# 3. DOWNLOAD OR IMPORT UPSTREAM INFLOWS
+###############################################################################
+
+if (!inflow_source %in% c(
+  "usgs",
+  "cdec",
+  "user",
+  "international",
+  "combined"
+)) {
+  stop(
+    "inflow_source must be one of: ",
+    paste(
+      c("usgs", "cdec", "user", "international", "combined"),
+      collapse = ", "
+    )
+  )
+}
+
+## ---- USGS inflows -----------------------------------------------------------
+
+if (inflow_source == "usgs") {
+
+  qin <- wad_get_upstream_inflows(
+    usgs_sites = usgs_sites,
+    start_date = start_date,
+    end_date = end_date,
+    units = inflow_output_units,
+    na_rm = na_rm
+  )
+}
+
+
+## ---- CDEC inflows -----------------------------------------------------------
+
+if (inflow_source == "cdec") {
+
+  qin <- wad_get_upstream_inflows(
+    cdec_sites = cdec_sites,
+    cdec_sensor = cdec_sensor,
+    cdec_dur_code = cdec_dur_code,
+    cdec_units = cdec_units,
+    start_date = start_date,
+    end_date = end_date,
+    units = inflow_output_units,
+    na_rm = na_rm
+  )
+}
+
+
+## ---- User-provided inflows --------------------------------------------------
+
+if (inflow_source == "user") {
+
+  if (is.null(user_inflows)) {
+    stop(
+      "Set user_inflows to a data frame or read a user inflow CSV file."
+    )
+  }
+
+  qin <- wad_get_upstream_inflows(
+    inflow_data = user_inflows,
+    user_flow_cols = user_flow_cols,
+    inflow_units = user_inflow_units,
+    start_date = start_date,
+    end_date = end_date,
+    units = inflow_output_units,
+    na_rm = na_rm
+  )
+}
+
+
+## ---- International/non-US inflows -------------------------------------------
+
+if (inflow_source == "international") {
+
+  if (is.null(international_inflows) &&
+      is.null(international_reader)) {
+    stop(
+      "Provide international_inflows or international_reader."
+    )
+  }
+
+  qin <- wad_get_upstream_inflows(
+    other_data = international_inflows,
+    other_flow_cols = international_flow_cols,
+    other_units = international_units,
+    other_sites = international_sites,
+    other_reader = international_reader,
+    start_date = start_date,
+    end_date = end_date,
+    units = inflow_output_units,
+    na_rm = na_rm
+  )
+}
+
+
+## ---- Combined sources -------------------------------------------------------
+
+# This option can combine USGS, CDEC, user-provided, and international data.
+#
+# Before selecting "combined", define the required objects above.
+
+if (inflow_source == "combined") {
+
+  qin <- wad_get_upstream_inflows(
+    usgs_sites = usgs_sites,
+    cdec_sites = cdec_sites,
+    cdec_sensor = cdec_sensor,
+    cdec_dur_code = cdec_dur_code,
+    cdec_units = cdec_units,
+    inflow_data = user_inflows,
+    user_flow_cols = user_flow_cols,
+    inflow_units = user_inflow_units,
+    other_data = international_inflows,
+    other_flow_cols = international_flow_cols,
+    other_units = international_units,
+    other_sites = international_sites,
+    other_reader = international_reader,
+    start_date = start_date,
+    end_date = end_date,
+    units = inflow_output_units,
+    na_rm = na_rm
+  )
+}
+
+
+## ---- Inspect inflows --------------------------------------------------------
+
+if (!all(c("Date", "Q_upstream") %in% names(qin))) {
+  stop(
+    "The inflow output must contain Date and Q_upstream columns."
+  )
+}
+
+head(qin)
+summary(qin$Q_upstream)
+
+
+###############################################################################
+# 4. COMPUTE SEASONAL INFLOW WEIGHTS
+###############################################################################
+
+# The inflow record should ideally contain all 12 calendar months.
+#
+# Seasonal weights are normalized so that their average is approximately 1.
+# A value greater than 1 indicates above-average monthly inflow.
+# A value less than 1 indicates below-average monthly inflow.
+
+seasonal_weights <- wad_seasonal_weights(
+  inflow_df = qin,
+  inflow_col = "Q_upstream",
+  missing_month = "error",
+  na_rm = TRUE
+)
+
+print(seasonal_weights)
+
+# Confirm normalization
+mean(seasonal_weights)
+
+
+###############################################################################
+# 5. USER STORAGE-RULE SETTINGS
+###############################################################################
+
+# Select one:
+#
+#   "direct_storage"
+#       The input file already contains a storage rule.
+#
+#   "elevation_only"
+#       The input contains elevation, and storage is calculated from
+#       user-supplied elevation and storage limits.
+#
+storage_rule_source <- "direct_storage"
+
+
+## ---- Storage-rule file ------------------------------------------------------
+
+# Each reservoir must provide its own storage or elevation data.
+# WaDorule does not use a universal default reservoir curve.
+
+storage_rule_file <- "C:/path/to/your/storage_rule.csv"
+
+
+## ---- Storage units and operational limits -----------------------------------
+
+# These values are required only when storage is calculated from elevation.
+
+min_storage_acft <- 10000
+max_storage_acft <- 50000
+
+# Optional operational elevation limits in feet.
+# If NULL, the minimum and maximum elevations in the input data are used.
+
+min_elev_ft <- NULL
+max_elev_ft <- NULL
+
+
+###############################################################################
+# 6. COMPUTE OR IMPORT THE STORAGE RULE
+###############################################################################
+
+if (!storage_rule_source %in% c(
+  "direct_storage",
+  "elevation_only"
+)) {
+  stop(
+    "storage_rule_source must be 'direct_storage' or 'elevation_only'."
+  )
+}
+
+if (!file.exists(storage_rule_file)) {
+  stop(
+    "Storage-rule file was not found: ",
+    storage_rule_file
+  )
+}
+
+if (storage_rule_source == "direct_storage") {
+
+  # The file must contain a recognized storage column, such as:
+  #
+  #   target_storage_MCM
+  #   Target_Storage_MCM
+  #   storage_MCM
+  #   target_storage_acft
+  #   Storage
+  #
+  # If storage is supplied directly, minimum and maximum storage limits are
+  # not required for this function.
+
+  target_storage <- wad_compute_target_storage(
+    elev_file = storage_rule_file
+  )
+}
+
+if (storage_rule_source == "elevation_only") {
+
+  # The file must contain an elevation column such as Target_Elev or Elevation.
+  # Storage is calculated from user-supplied operational limits.
+
+  target_storage <- wad_compute_target_storage(
+    elev_file = storage_rule_file,
+    min_storage_acft = min_storage_acft,
+    max_storage_acft = max_storage_acft,
+    min_elev_ft = min_elev_ft,
+    max_elev_ft = max_elev_ft
+  )
+}
+
+head(target_storage)
+
+
+###############################################################################
+# 7. PROVIDE DAILY RESERVOIR STORAGE FOR THE RELEASE POLICY
+###############################################################################
+
+# wad_release_policy() requires a data frame with:
+#
+#   Date
+#   Storage
+#
+# Storage must be the actual daily reservoir storage state used to determine
+# releases, expressed in MCM.
+#
+# This may be:
+#
+#   - observed daily storage,
+#   - simulated daily storage,
+#   - or another daily operational storage series.
+#
+# The target storage rule calculated above is an operational target. It is not
+# automatically used as the current storage state.
+
+storage_state_file <- "C:/path/to/your/daily_reservoir_storage.csv"
+
+if (!file.exists(storage_state_file)) {
+  stop(
+    "Daily reservoir storage file was not found: ",
+    storage_state_file
+  )
+}
+
+storage_state <- utils::read.csv(
+  storage_state_file,
+  stringsAsFactors = FALSE
+)
+
+if (!"Date" %in% names(storage_state)) {
+  stop("The storage-state file must contain a Date column.")
+}
+
+if (!"Storage" %in% names(storage_state)) {
+  stop(
+    "The storage-state file must contain a Storage column in MCM."
+  )
+}
+
+storage_state$Date <- as.Date(storage_state$Date)
+
+if (anyNA(storage_state$Date)) {
+  stop("The storage-state file contains invalid dates.")
+}
+
+storage_state$Storage <- as.numeric(storage_state$Storage)
+
+if (all(is.na(storage_state$Storage))) {
+  stop("The Storage column contains no valid numeric values.")
+}
+
+storage_state <- storage_state[
+  storage_state$Date >= as.Date(start_date) &
+    storage_state$Date <= as.Date(end_date),
+  ,
+  drop = FALSE
+]
+
+if (nrow(storage_state) == 0) {
+  stop(
+    "No daily storage data are available for the selected date range."
+  )
+}
+
+
+###############################################################################
+# 8. SELECT RELEASE-POLICY SETTINGS
+###############################################################################
+
+# Select either:
+#
+#   "linear"
+#   "logistic"
+#
+release_rule <- "logistic"
+
+# Release limits in m3/s
+Qmin <- 0.57
+Qmax <- 550
+
+# Storage limits in MCM
+#
+# These values should correspond to the reservoir's operational storage range.
+Smin <- 0.5
+Smax <- 200.12
+
+# Logistic parameters are used only when release_rule = "logistic".
+logistic_k <- 8
+logistic_midpoint <- 0.55
+
+# Normalize the seasonal weights so their mean is 1.
+normalize_weights <- TRUE
+
+# If TRUE, final releases are constrained between Qmin and Qmax.
+cap_release <- TRUE
+
+
+###############################################################################
+# 9. GENERATE DAILY RELEASES
+###############################################################################
+
+release_df <- wad_release_policy(
+  df = storage_state,
+  seasonal_weights = seasonal_weights,
+  Smin = Smin,
+  Smax = Smax,
+  Qmin = Qmin,
+  Qmax = Qmax,
+  rule = release_rule,
+  logistic_k = logistic_k,
+  logistic_midpoint = logistic_midpoint,
+  normalize_weights = normalize_weights,
+  missing_weight = 1,
+  cap_release = cap_release,
+  plot = FALSE
+)
+
+head(release_df)
+summary(release_df$Release)
+
+
+###############################################################################
+# 10. OPTIONAL: COMPARE LINEAR AND LOGISTIC POLICIES
+###############################################################################
+
+release_linear <- wad_release_policy(
+  df = storage_state,
+  seasonal_weights = seasonal_weights,
+  Smin = Smin,
+  Smax = Smax,
+  Qmin = Qmin,
+  Qmax = Qmax,
+  rule = "linear",
+  normalize_weights = normalize_weights,
+  cap_release = cap_release,
+  plot = FALSE
+)
+
+release_logistic <- wad_release_policy(
+  df = storage_state,
+  seasonal_weights = seasonal_weights,
+  Smin = Smin,
+  Smax = Smax,
+  Qmin = Qmin,
+  Qmax = Qmax,
+  rule = "logistic",
+  logistic_k = logistic_k,
+  logistic_midpoint = logistic_midpoint,
+  normalize_weights = normalize_weights,
+  cap_release = cap_release,
+  plot = FALSE
+)
+
+
+###############################################################################
+# 11. SAVE RESULTS LOCALLY
+###############################################################################
+
+# Users can choose any local directory.
+# The default below creates an output folder in the current working directory.
+
+output_dir <- file.path(getwd(), "output")
+
+if (!dir.exists(output_dir)) {
+  dir.create(
+    output_dir,
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
+}
+
+utils::write.csv(
+  qin,
+  file = file.path(output_dir, "upstream_inflows.csv"),
+  row.names = FALSE
+)
+
+utils::write.csv(
+  data.frame(
+    Month = names(seasonal_weights),
+    Seasonal_Weight = as.numeric(seasonal_weights)
+  ),
+  file = file.path(output_dir, "seasonal_weights.csv"),
+  row.names = FALSE
+)
+
+utils::write.csv(
+  target_storage,
+  file = file.path(output_dir, "target_storage_rule.csv"),
+  row.names = FALSE
+)
+
+utils::write.csv(
+  storage_state,
+  file = file.path(output_dir, "daily_storage_state.csv"),
+  row.names = FALSE
+)
+
+utils::write.csv(
+  release_df,
+  file = file.path(output_dir, "release_policy.csv"),
+  row.names = FALSE
+)
+
+utils::write.csv(
+  release_linear,
+  file = file.path(output_dir, "release_policy_linear.csv"),
+  row.names = FALSE
+)
+
+utils::write.csv(
+  release_logistic,
+  file = file.path(output_dir, "release_policy_logistic.csv"),
+  row.names = FALSE
+)
+
+message(
+  "Results saved to: ",
+  normalizePath(output_dir, winslash = "/")
+)
+
+
+###############################################################################
+# 12. OPTIONAL PLOTS
+###############################################################################
+
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+
+  inflow_plot <- ggplot2::ggplot(
+    qin,
+    ggplot2::aes(
+      x = Date,
+      y = Q_upstream
+    )
+  ) +
+    ggplot2::geom_line(
+      color = "steelblue",
+      linewidth = 0.7
+    ) +
+    ggplot2::theme_minimal() +
+    ggplot2::labs(
+      title = "Aggregated Upstream Inflows",
+      x = "Date",
+      y = paste0("Inflow (", inflow_output_units, ")")
+    )
+
+  storage_plot <- ggplot2::ggplot(
+    storage_state,
+    ggplot2::aes(
+      x = Date,
+      y = Storage
+    )
+  ) +
+    ggplot2::geom_line(
+      color = "darkgreen",
+      linewidth = 0.7
+    ) +
+    ggplot2::geom_hline(
+      yintercept = Smin,
+      linetype = "dashed",
+      color = "red"
+    ) +
+    ggplot2::geom_hline(
+      yintercept = Smax,
+      linetype = "dashed",
+      color = "red"
+    ) +
+    ggplot2::theme_minimal() +
+    ggplot2::labs(
+      title = "Daily Reservoir Storage",
+      x = "Date",
+      y = "Storage (MCM)"
+    )
+
+  release_plot <- ggplot2::ggplot(
+    release_df,
+    ggplot2::aes(
+      x = Date,
+      y = Release
+    )
+  ) +
+    ggplot2::geom_line(
+      color = "firebrick",
+      linewidth = 0.7
+    ) +
+    ggplot2::theme_minimal() +
+    ggplot2::labs(
+      title = paste(
+        "Daily Reservoir Release Policy -",
+        release_rule
+      ),
+      x = "Date",
+      y = "Release (m3/s)"
+    )
+
+  ggplot2::ggsave(
+    filename = file.path(output_dir, "upstream_inflows.png"),
+    plot = inflow_plot,
+    width = 8,
+    height = 5,
+    dpi = 300
+  )
+
+  ggplot2::ggsave(
+    filename = file.path(output_dir, "daily_storage.png"),
+    plot = storage_plot,
+    width = 8,
+    height = 5,
+    dpi = 300
+  )
+
+  ggplot2::ggsave(
+    filename = file.path(output_dir, "release_policy.png"),
+    plot = release_plot,
+    width = 8,
+    height = 5,
+    dpi = 300
+  )
+
+  print(inflow_plot)
+  print(storage_plot)
+  print(release_plot)
+
+} else {
+  message(
+    "ggplot2 is not installed. CSV files were saved, but plots were skipped."
+  )
+}
+
+
+###############################################################################
+# END OF WADORULE WORKFLOW
+###############################################################################
+```^X
+
