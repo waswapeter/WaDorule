@@ -1,0 +1,43 @@
+Reservoir constraints' Definitions:
+#==========================================================================================================================
+Smin: Minimum storage in Million Cubic Meters
+Smax: Maximum storage in Million Cubic Meters
+Rmin: Minimum release in Cubic meters per second
+Rmax: Maximum release in Cubic meters per second
+#==========================================================================================================================
+
+Reservoir Names and Agency:
+8001_USBR: Hoover Dam; 753_USACE: Garrison Dam; 1761_USACE: John H. Kerr Dam; 597_USBR: Glen Canyon; 870_USACE: Oahe Dam;
+307_USACE: Fort Peck Dam; 310_USBR: Grand Coulee; 1753_TVA: Kentucky; 1756_JCS: Wolf Creek; 8000_USACE: Libby Dam;
+1036_USACE: Bull Shoals; 989_USACE: Harry S. Truman Dam; 1135_USACE: Denison Dam; 1269_TWDB: Toledo Bend; 132_CDEC: Shasta;
+451_USBR: Flaming Gorge; 1077_USACE: Eufaula Lake; 1872_USACE: J. Strom Thurmond Dam;  1026_USACE:  Table Rock Dam;
+1112_USACE: Blakely Mountain Dam; 148_CDEC: Oroville; 1851_USACE: Hartwell Dam; 1770_TVA: Norris; 198_CDEC: New Melones
+
+#==========================================================================================================================
+Reservoir constraints 
+#==========================================================================================================================
+8001_USBR: Smin <- 2933; Smax <- 35703; Rmin <- 28;  Rmax <- 1133
+753_USACE: Smin <- 5910; Smax <- 28928; Rmin <- 142; Rmax <- 917
+1761_USACE:Smin <- 544;  Smax <- 4150 ; Rmin <- 2.83; Rmax <- 1316
+1275_USACE:Smin <- 23;  Smax <- 7642 ; Rmin <- 1.83; Rmax <- 242.3
+597_USBR:Smin <- 2343;  Smax <- 31034 ; Rmin <- 141.6; Rmax <- 984
+870_USACE:Smin <- 6556;  Smax <- 28349 ; Rmin <- 84.95; Rmax <- 899
+307_USACE:Smin <- 5042;  Smax <- 22774 ; Rmin <- 120; Rmax <- 722
+310_USBR:Smin <- 5427;  Smax <- 11841 ; Rmin <- 2000; Rmax <- 4500
+1753_TVA:Smin <- 2617;  Smax <- 7560 ; Rmin <- 569.9; Rmax <- 2400
+1756_JCS:Smin <- 2286;  Smax <- 7510 ; Rmin <- 28.3; Rmax <- 238.1
+8000_USACE:Smin <- 149;  Smax <- 7239 ; Rmin <- 90; Rmax <- 800
+1036_USACE:Smin <- 2522;  Smax <- 6671 ; Rmin <- 22.65; Rmax <- 211.5
+989_USACE:Smin <- 1458;  Smax <- 6426 ; Rmin <- 1.5; Rmax <- 203.8
+1135_USACE:Smin <- 1274;  Smax <- 6087 ; Rmin <- 1.98; Rmax <- 193
+1269_TWDB:Smin <- 0.5;  Smax <- 5751 ; Rmin <- 4.25; Rmax <- 182.4
+132_CDEC:Smin <- 728;  Smax <- 5615 ; Rmin <- 92; Rmax <- 178
+451_USBR:Smin <- 49;  Smax <- 4674 ; Rmin <- 25.65; Rmax <- 148.2
+1077_USACE:Smin <- 1039;  Smax <- 4371 ; Rmin <- 0.85; Rmax <- 138.6
+1872_USACE:Smin <- 1807;  Smax <- 3577 ; Rmin <- 95; Rmax <- 260
+1026_USACE:Smin <- 1876;  Smax <- 4271 ; Rmin <- 50.2; Rmax <- 135.4
+1112_USACE:Smin <- 1067;  Smax <- 3415 ; Rmin <- 1.25; Rmax <- 108.3
+148_CDEC:Smin <- 36.5;  Smax <- 4225 ; Rmin <- 20; Rmax <- 140
+1851_USACE:Smin <- 1203;  Smax <- 3507 ; Rmin <- 46.6; Rmax <- 121.2
+1770_TVA:Smin <- 1390;  Smax <- 3447 ; Rmin <- 22.7; Rmax <- 109.3
+198_CDEC:Smin <- 370;  Smax <- 2984 ; Rmin <- 5.66; Rmax <- 94.6
