@@ -1,7 +1,6 @@
 # Code developed by Peter Wasswa @ Duke University.
 #These codes do the analysis used in this paper
 ###############################################################################
-
 library(readr)
 library(dplyr)
 library(ggplot2)
@@ -52,7 +51,7 @@ dams <- read_csv(
     Operational_Target = as.character(Operational_Target),
     Primary_Purpose = as.character(Primary_Purpose),
     Other_Uses = as.character(Other_Uses),
-    
+
     Latitude = parse_number(as.character(Latitude)),
     Longitude = parse_number(as.character(Longitude)),
     Storage_AF = parse_number(as.character(Storage_AF))
@@ -87,23 +86,23 @@ dams <- dams %>%
 ###############################################################################
 
 if (background_type == "nca") {
-  
+
   background <- st_read(
     climate_file,
     quiet = TRUE
   )
-  
+
   background_name <- "NCA-7 regions"
-  
+
 } else if (background_type == "climate") {
-  
+
   background <- st_read(
     nca_file,
     quiet = TRUE
   )
-  
+
   background_name <- "CONUS climate zones"
-  
+
 } else {
   stop("background_type must be either 'nca' or 'climate'.")
 }
@@ -196,7 +195,7 @@ if (length(missing_targets) > 0) {
 ###############################################################################
 
 p <- ggplot() +
-  
+
   # Climate-zone or NCA-7 background
   geom_sf(
     data = background,
@@ -204,7 +203,13 @@ p <- ggplot() +
     color = "grey55",
     linewidth = 0.35
   ) +
-  
+
+  # Reservoir symbols
+  #
+  # Fill       = managing agency
+  # Size       = storage capacity
+  # Shape      = primary purpose
+  # Colour     = operational target
   geom_sf(
     data = dams_sf,
     aes(
@@ -216,7 +221,7 @@ p <- ggplot() +
     alpha = 0.90,
     stroke = 1.1
   ) +
-  
+
   # Reservoir labels
   geom_label_repel(
     data = dam_coords,
@@ -238,7 +243,7 @@ p <- ggplot() +
     seed = 123,
     show.legend = FALSE
   ) +
-  
+
   # Storage capacity
   scale_size_area(
     name = "Storage capacity (AF)",
@@ -250,7 +255,7 @@ p <- ggplot() +
       accuracy = 1
     )
   ) +
-  
+
   # Managing agency
   scale_fill_viridis_d(
     name = "Managing agency",
@@ -258,26 +263,26 @@ p <- ggplot() +
     end = 0.90,
     na.value = "grey60"
   ) +
-  
+
   # Primary purpose
   scale_shape_manual(
     name = "Primary purpose",
     values = shape_values,
     na.value = 21
   ) +
-  
+
   # Operational target
   scale_color_manual(
     name = "Operational target",
     values = target_colors,
     na.value = "black"
   ) +
-  
+
   coord_sf(
     crs = 5070,
     expand = FALSE
   ) +
-  
+
   guides(
     fill = guide_legend(
       order = 1,
@@ -295,36 +300,36 @@ p <- ggplot() +
       order = 4
     )
   ) +
-  
+
   theme_minimal(base_size = 10) +
-  
+
   theme(
     panel.grid.major = element_line(
       color = "grey86",
       linewidth = 0.25
     ),
     panel.grid.minor = element_blank(),
-    
+
     legend.position = "bottom",
     legend.box = "vertical",
     legend.title = element_text(face = "bold"),
     legend.text = element_text(size = 8),
-    
+
     plot.title = element_text(
       face = "bold",
       size = 13
     ),
-    
+
     plot.subtitle = element_text(
       size = 9
     ),
-    
+
     plot.caption = element_text(
       hjust = 0,
       size = 8,
       color = "grey30"
     ),
-    
+
     axis.text = element_text(size = 8)
   )
 
@@ -360,7 +365,7 @@ ggsave(
 
 cat("PNG map saved to:\n", output_png, "\n")
 cat("PDF map saved to:\n", output_pdf, "\n")
-
+#################################################################################
 
 #############################################################################
 library(tidyverse)
@@ -466,7 +471,7 @@ reservoir_plot <- ggplot(
   ) +
   labs(
     x = "Day of Year",
-    y = expression("Release Policy (" * m^3 * s^{-1} * ")")
+    y = expression("Derived Release Target (" * m^3 * s^{-1} * ")")
   ) +
   theme_minimal(
     base_size = 12,
@@ -537,14 +542,16 @@ reservoir_plot <- ggplot(
 
 # Display the plot
 print(reservoir_plot)
-
-##############################################################################
-
+#####################################################################################################
 # ============================================================
 # Four-reservoir analysis:
-# Mean monthly inflow volume, average monthly flow,
-# monthly release policy, target storage, target elevation,
-# and CONUS/NCA reservoir-location map
+#
+# Mean monthly inflow volume
+# Average monthly inflow flow
+# Monthly target storage
+# Monthly release policy
+# Observed daily outflows
+# CONUS/NCA reservoir-location map
 #
 # Reservoirs:
 #   Hoover
@@ -552,20 +559,43 @@ print(reservoir_plot)
 #   John Kerr
 #   Sam Rayburn
 #
+# ------------------------------------------------------------
 # Input inflow columns:
 #   Date
 #   Inflows_m/s^3
 #
+# Input outflow columns:
+#   date
+#   outflow
+#
 # Input target columns:
 #   target_stor_final
 #   target_rel_final
-#   target_elev_final
 #
+# ------------------------------------------------------------
+# Important temporal treatment:
+#
+# Inflows:
+#   Daily observations restricted to 1970–2020 for panel (a).
+#
+# Observed outflows:
+#   Daily observations restricted to 1970–2020 for panel (d).
+#   These are NOT treated as a 366-day seasonal series.
+#
+# Targets:
+#   366-day seasonal target series.
+#   Used to derive 12 monthly target values.
+#
+# ------------------------------------------------------------
 # Units:
 #   Inflow:           m3/s
 #   Release policy:   m3/s
 #   Target storage:   MCM
-#   Target elevation: m
+#   Observed outflow: m3/s
+# ============================================================
+
+# ============================================================
+# Packages
 # ============================================================
 
 library(tidyverse)
@@ -576,7 +606,7 @@ library(ggrepel)
 library(scales)
 
 # ============================================================
-# 1. File locations
+# Directories
 # ============================================================
 
 data_dir <- paste0(
@@ -601,7 +631,15 @@ nca_file <- paste0(
 )
 
 # ============================================================
-# 2. Reservoir information and exact file matching
+# Comparison period
+# Panels (a) and (d) only
+# ============================================================
+
+comparison_start <- as.Date("1970-01-01")
+comparison_end   <- as.Date("2020-12-31")
+
+# ============================================================
+# Reservoir information
 # ============================================================
 
 dam_info <- tibble(
@@ -626,6 +664,13 @@ dam_info <- tibble(
     "Sam_Rayburn_inflows.csv"
   ),
   
+  Outflow_File = c(
+    "Hoover_outflow.csv",
+    "Garrison_outflow.csv",
+    "John_Kerr_outflow.csv",
+    "Sam_Rayburn_outflow.csv"
+  ),
+  
   Target_File = c(
     "Hoover_targets.csv",
     "Garrison_targets.csv",
@@ -648,19 +693,29 @@ dam_info <- tibble(
   )
 )
 
-# Check the explicit dam-file matching
-print(
-  dam_info %>%
-    select(
-      Dam_ID,
-      Dam_Label,
-      Inflow_File,
-      Target_File
+# ============================================================
+# Date parser
+# ============================================================
+
+parse_dates <- function(x) {
+  
+  as.Date(
+    parse_date_time(
+      as.character(x),
+      orders = c(
+        "mdy",
+        "m/d/Y",
+        "m/d/y",
+        "ymd",
+        "Y-m-d"
+      ),
+      quiet = TRUE
     )
-)
+  )
+}
 
 # ============================================================
-# 3. Read daily inflow files
+# Read inflows
 # ============================================================
 
 read_inflows <- function(file_name) {
@@ -672,10 +727,8 @@ read_inflows <- function(file_name) {
   
   if (!file.exists(file_path)) {
     stop(
-      paste0(
-        "Inflow file not found:\n",
-        file_path
-      )
+      "Inflow file not found:\n",
+      file_path
     )
   }
   
@@ -697,36 +750,21 @@ read_inflows <- function(file_name) {
   
   if (length(missing_columns) > 0) {
     stop(
-      paste0(
-        "Missing inflow column(s) in ",
-        basename(file_path),
-        ":\n",
-        paste(missing_columns, collapse = ", "),
-        "\nAvailable columns:\n",
-        paste(names(x), collapse = ", ")
+      "Missing inflow column(s) in ",
+      basename(file_path),
+      ": ",
+      paste(
+        missing_columns,
+        collapse = ", "
       )
     )
   }
   
   inflows <- x %>%
     transmute(
-      
-      Date = as.Date(
-        parse_date_time(
-          as.character(.data[["Date"]]),
-          orders = c(
-            "mdy",
-            "m/d/Y",
-            "m/d/y",
-            "ymd",
-            "Y-m-d"
-          ),
-          quiet = TRUE
-        )
+      Date = parse_dates(
+        .data[["Date"]]
       ),
-      
-      # Inflows are already in m3/s.
-      # No conversion is applied here.
       Inflow = as.numeric(
         .data[["Inflows_m/s^3"]]
       )
@@ -739,10 +777,8 @@ read_inflows <- function(file_name) {
   
   if (nrow(inflows) == 0) {
     stop(
-      paste0(
-        "No valid inflow records found in ",
-        basename(file_path)
-      )
+      "No valid inflow records found in ",
+      basename(file_path)
     )
   }
   
@@ -750,7 +786,78 @@ read_inflows <- function(file_name) {
 }
 
 # ============================================================
-# 4. Read 366-day target files
+# Read observed outflows
+# ============================================================
+
+read_outflows <- function(file_name) {
+  
+  file_path <- file.path(
+    data_dir,
+    file_name
+  )
+  
+  if (!file.exists(file_path)) {
+    stop(
+      "Outflow file not found:\n",
+      file_path
+    )
+  }
+  
+  x <- read_csv(
+    file_path,
+    show_col_types = FALSE,
+    name_repair = "minimal"
+  )
+  
+  required_columns <- c(
+    "date",
+    "outflow"
+  )
+  
+  missing_columns <- setdiff(
+    required_columns,
+    names(x)
+  )
+  
+  if (length(missing_columns) > 0) {
+    stop(
+      "Missing outflow column(s) in ",
+      basename(file_path),
+      ": ",
+      paste(
+        missing_columns,
+        collapse = ", "
+      )
+    )
+  }
+  
+  outflows <- x %>%
+    transmute(
+      Date = parse_dates(
+        .data[["date"]]
+      ),
+      Outflow = as.numeric(
+        .data[["outflow"]]
+      )
+    ) %>%
+    filter(
+      !is.na(Date),
+      !is.na(Outflow)
+    ) %>%
+    arrange(Date)
+  
+  if (nrow(outflows) == 0) {
+    stop(
+      "No valid outflow records found in ",
+      basename(file_path)
+    )
+  }
+  
+  outflows
+}
+
+# ============================================================
+# Read 366-day target series
 # ============================================================
 
 read_targets <- function(file_name) {
@@ -762,10 +869,8 @@ read_targets <- function(file_name) {
   
   if (!file.exists(file_path)) {
     stop(
-      paste0(
-        "Target file not found:\n",
-        file_path
-      )
+      "Target file not found:\n",
+      file_path
     )
   }
   
@@ -777,8 +882,7 @@ read_targets <- function(file_name) {
   
   required_columns <- c(
     "target_stor_final",
-    "target_rel_final",
-    "target_elev_final"
+    "target_rel_final"
   )
   
   missing_columns <- setdiff(
@@ -788,57 +892,45 @@ read_targets <- function(file_name) {
   
   if (length(missing_columns) > 0) {
     stop(
-      paste0(
-        "Missing target column(s) in ",
-        basename(file_path),
-        ":\n",
-        paste(missing_columns, collapse = ", "),
-        "\nAvailable columns:\n",
-        paste(names(x), collapse = ", ")
+      "Missing target column(s) in ",
+      basename(file_path),
+      ": ",
+      paste(
+        missing_columns,
+        collapse = ", "
       )
     )
   }
   
   if (nrow(x) != 366) {
     stop(
-      paste0(
-        basename(file_path),
-        " contains ",
-        nrow(x),
-        " rows. Exactly 366 rows are required."
-      )
+      basename(file_path),
+      " contains ",
+      nrow(x),
+      " rows. Exactly 366 rows are required."
     )
   }
   
   targets <- x %>%
     transmute(
-      
       Day = seq_len(n()),
       
-      # Target storage is already in MCM
       Target_Storage = as.numeric(
         .data[["target_stor_final"]]
       ),
       
-      # Target release is already in m3/s
       Target_Release = as.numeric(
         .data[["target_rel_final"]]
-      ),
-      
-      # Target elevation is already in metres
-      Target_Elevation = as.numeric(
-        .data[["target_elev_final"]]
       )
     ) %>%
     mutate(
       
-      # Leap year includes day 366
-      Reference_Date = as.Date("2000-01-01") +
+      Reference_Date =
+        as.Date("2000-01-01") +
         days(Day - 1),
       
-      Month_Number = month(
-        Reference_Date
-      ),
+      Month_Number =
+        month(Reference_Date),
       
       Month = factor(
         month(
@@ -847,33 +939,39 @@ read_targets <- function(file_name) {
           abbr = TRUE
         ),
         levels = month.abb
-      )
+      ),
+      
+      Target_X =
+        Month_Number +
+        (day(Reference_Date) - 0.5) /
+        days_in_month(Reference_Date)
     )
   
   targets
 }
 
 # ============================================================
-# 5. Process one reservoir
+# Process reservoir
 # ============================================================
 
 process_dam <- function(
     dam_id,
     dam_label,
     inflow_file,
+    outflow_file,
     target_file
 ) {
   
-  message(
-    "\nProcessing ",
-    dam_label,
-    " [",
-    dam_id,
-    "]"
+  # ----------------------------------------------------------
+  # Read complete source records
+  # ----------------------------------------------------------
+  
+  inflows_all <- read_inflows(
+    inflow_file
   )
   
-  inflows <- read_inflows(
-    inflow_file
+  outflows_all <- read_outflows(
+    outflow_file
   )
   
   targets <- read_targets(
@@ -881,15 +979,55 @@ process_dam <- function(
   )
   
   # ----------------------------------------------------------
-  # Add calendar fields to daily inflow data
+  # Restrict inflows to 1970–2020 for panel (a)
+  # ----------------------------------------------------------
+  
+  inflows <- inflows_all %>%
+    filter(
+      Date >= comparison_start,
+      Date <= comparison_end
+    )
+  
+  # ----------------------------------------------------------
+  # Restrict observed releases to 1970–2020 for panel (d)
+  # ----------------------------------------------------------
+  
+  outflows <- outflows_all %>%
+    filter(
+      Date >= comparison_start,
+      Date <= comparison_end
+    )
+  
+  # ----------------------------------------------------------
+  # Check that both comparison datasets contain observations
+  # ----------------------------------------------------------
+  
+  if (nrow(inflows) == 0) {
+    stop(
+      "No inflow records for ",
+      dam_label,
+      " within 1970–2020."
+    )
+  }
+  
+  if (nrow(outflows) == 0) {
+    stop(
+      "No observed release records for ",
+      dam_label,
+      " within 1970–2020."
+    )
+  }
+  
+  # ----------------------------------------------------------
+  # Daily inflow data
   # ----------------------------------------------------------
   
   inflows_daily <- inflows %>%
     mutate(
-      
       Year = year(Date),
       
-      Month_Number = month(Date),
+      Month_Number =
+        month(Date),
       
       Month = factor(
         month(
@@ -900,21 +1038,42 @@ process_dam <- function(
         levels = month.abb
       ),
       
-      Month_Date = floor_date(
-        Date,
-        unit = "month"
-      )
+      Month_Date =
+        floor_date(
+          Date,
+          "month"
+        )
     )
   
   # ----------------------------------------------------------
-  # Calculate monthly inflow statistics
+  # Daily observed release data
   # ----------------------------------------------------------
-  #
-  # Monthly_Total_MCM is physically meaningful monthly volume:
-  #
-  # m3/s x 86,400 seconds/day / 1,000,000
-  #
-  # Monthly_Mean_Inflow remains in m3/s.
+  
+  outflows_daily <- outflows %>%
+    mutate(
+      Year = year(Date),
+      
+      Month_Number =
+        month(Date),
+      
+      Month = factor(
+        month(
+          Date,
+          label = TRUE,
+          abbr = TRUE
+        ),
+        levels = month.abb
+      ),
+      
+      Month_Date =
+        floor_date(
+          Date,
+          "month"
+        )
+    )
+  
+  # ----------------------------------------------------------
+  # Monthly inflow statistics
   # ----------------------------------------------------------
   
   monthly_inflows <- inflows_daily %>%
@@ -926,138 +1085,209 @@ process_dam <- function(
     ) %>%
     summarise(
       
-      Monthly_Total_MCM = sum(
-        Inflow * 86400 / 1e6,
-        na.rm = TRUE
-      ),
+      Monthly_Total_MCM =
+        sum(
+          Inflow * 86400 / 1e6,
+          na.rm = TRUE
+        ),
       
-      Monthly_Mean_Inflow = mean(
-        Inflow,
-        na.rm = TRUE
-      ),
+      Monthly_Mean_Inflow =
+        mean(
+          Inflow,
+          na.rm = TRUE
+        ),
       
-      Number_of_Days = sum(
-        !is.na(Inflow)
-      ),
+      Number_of_Days =
+        sum(!is.na(Inflow)),
       
       .groups = "drop"
     ) %>%
     arrange(Month_Date)
   
   # ----------------------------------------------------------
-  # Calculate long-term monthly climatology
+  # Average monthly inflow statistics
   # ----------------------------------------------------------
   
-  average_monthly_inflows <- monthly_inflows %>%
+  average_monthly_inflows <-
+    monthly_inflows %>%
+    
     group_by(
       Month_Number,
       Month
     ) %>%
+    
     summarise(
       
-      # Average monthly volume across all available years
-      Mean_Monthly_Total_MCM = mean(
-        Monthly_Total_MCM,
-        na.rm = TRUE
-      ),
+      Mean_Monthly_Total_MCM =
+        mean(
+          Monthly_Total_MCM,
+          na.rm = TRUE
+        ),
       
-      SD_Monthly_Total_MCM = sd(
-        Monthly_Total_MCM,
-        na.rm = TRUE
-      ),
+      SD_Monthly_Total_MCM =
+        sd(
+          Monthly_Total_MCM,
+          na.rm = TRUE
+        ),
       
-      # Average daily flow for each calendar month
-      Mean_Monthly_Flow = mean(
-        Monthly_Mean_Inflow,
-        na.rm = TRUE
-      ),
+      Mean_Monthly_Flow =
+        mean(
+          Monthly_Mean_Inflow,
+          na.rm = TRUE
+        ),
       
-      SD_Monthly_Flow = sd(
-        Monthly_Mean_Inflow,
-        na.rm = TRUE
-      ),
+      SD_Monthly_Flow =
+        sd(
+          Monthly_Mean_Inflow,
+          na.rm = TRUE
+        ),
       
-      Number_of_Years = n(),
+      Number_of_Years =
+        n(),
       
       .groups = "drop"
     ) %>%
-    arrange(Month_Number)
+    
+    arrange(
+      Month_Number
+    )
   
   # ----------------------------------------------------------
-  # Calculate monthly operational targets
+  # Monthly storage target
+  #
+  # Target series remains unchanged and is not restricted
+  # to 1970–2020.
   # ----------------------------------------------------------
   
   monthly_targets <- targets %>%
+    
     group_by(
       Month_Number,
       Month
     ) %>%
+    
     summarise(
       
-      Target_Storage = mean(
-        Target_Storage,
-        na.rm = TRUE
-      ),
-      
-      Target_Release = mean(
-        Target_Release,
-        na.rm = TRUE
-      ),
-      
-      Target_Elevation = mean(
-        Target_Elevation,
-        na.rm = TRUE
-      ),
+      Target_Storage =
+        mean(
+          Target_Storage,
+          na.rm = TRUE
+        ),
       
       .groups = "drop"
     ) %>%
-    arrange(Month_Number)
+    
+    arrange(
+      Month_Number
+    )
+  
+  # ----------------------------------------------------------
+  # Return processed data
+  # ----------------------------------------------------------
   
   list(
-    Dam_ID = dam_id,
-    Dam_Label = dam_label,
-    Monthly_Inflows = monthly_inflows,
-    Average_Monthly_Inflows = average_monthly_inflows,
-    Monthly_Targets = monthly_targets
+    
+    Dam_ID =
+      dam_id,
+    
+    Dam_Label =
+      dam_label,
+    
+    Inflows =
+      inflows,
+    
+    Monthly_Inflows =
+      monthly_inflows,
+    
+    Average_Monthly_Inflows =
+      average_monthly_inflows,
+    
+    Outflows =
+      outflows_daily,
+    
+    Targets =
+      targets,
+    
+    Monthly_Targets =
+      monthly_targets,
+    
+    Inflow_Record_Start =
+      min(
+        inflows$Date,
+        na.rm = TRUE
+      ),
+    
+    Inflow_Record_End =
+      max(
+        inflows$Date,
+        na.rm = TRUE
+      ),
+    
+    Outflow_Record_Start =
+      min(
+        outflows$Date,
+        na.rm = TRUE
+      ),
+    
+    Outflow_Record_End =
+      max(
+        outflows$Date,
+        na.rm = TRUE
+      ),
+    
+    Inflow_N =
+      nrow(inflows),
+    
+    Outflow_N =
+      nrow(outflows)
   )
 }
 
 # ============================================================
-# 6. Process all reservoirs
+# Process all reservoirs
 # ============================================================
 
-dam_results <- vector(
-  mode = "list",
-  length = nrow(dam_info)
+dam_results <- setNames(
+  
+  lapply(
+    seq_len(
+      nrow(dam_info)
+    ),
+    
+    function(i) {
+      
+      process_dam(
+        
+        dam_id =
+          dam_info$Dam_ID[i],
+        
+        dam_label =
+          dam_info$Dam_Label[i],
+        
+        inflow_file =
+          dam_info$Inflow_File[i],
+        
+        outflow_file =
+          dam_info$Outflow_File[i],
+        
+        target_file =
+          dam_info$Target_File[i]
+      )
+    }
+  ),
+  
+  dam_info$Dam_ID
 )
 
-names(dam_results) <- dam_info$Dam_ID
-
-for (i in seq_len(nrow(dam_info))) {
-  
-  dam_id <- dam_info$Dam_ID[i]
-  
-  dam_results[[dam_id]] <- process_dam(
-    dam_id = dam_id,
-    dam_label = dam_info$Dam_Label[i],
-    inflow_file = dam_info$Inflow_File[i],
-    target_file = dam_info$Target_File[i]
-  )
-}
-
-# Confirm correct result names
-print(names(dam_results))
-
 # ============================================================
-# 7. Read NCA shapefile and prepare map
+# Read NCA shapefile
 # ============================================================
 
 if (!file.exists(nca_file)) {
+  
   stop(
-    paste0(
-      "NCA shapefile not found:\n",
-      nca_file
-    )
+    "NCA shapefile not found:\n",
+    nca_file
   )
 }
 
@@ -1066,34 +1296,19 @@ nca_regions <- st_read(
   quiet = TRUE
 )
 
-message(
-  "NCA shapefile CRS:"
-)
-
-print(st_crs(nca_regions))
-
 if (is.na(st_crs(nca_regions))) {
+  
   stop(
-    paste(
-      "The NCA shapefile has no CRS.",
-      "Assign its original CRS using st_set_crs()",
-      "before continuing."
-    )
+    "The NCA shapefile has no CRS."
   )
 }
 
-# Repair invalid geometries
-nca_regions <- st_make_valid(
-  nca_regions
-)
+nca_regions <- nca_regions %>%
+  
+  st_make_valid() %>%
+  
+  st_transform(4326)
 
-# Transform to longitude/latitude
-nca_regions <- st_transform(
-  nca_regions,
-  crs = 4326
-)
-
-# Crop to CONUS
 conus <- st_crop(
   nca_regions,
   xmin = -125,
@@ -1102,8 +1317,8 @@ conus <- st_crop(
   ymax = 50
 )
 
-# Convert dam locations to sf points
 dam_points <- dam_info %>%
+  
   st_as_sf(
     coords = c(
       "Longitude",
@@ -1114,7 +1329,7 @@ dam_points <- dam_info %>%
   )
 
 # ============================================================
-# 8. Create CONUS map without a map title
+# CONUS map
 # ============================================================
 
 conus_map <- ggplot() +
@@ -1126,7 +1341,6 @@ conus_map <- ggplot() +
     linewidth = 0.35
   ) +
   
-  # All reservoirs
   geom_sf(
     data = dam_points,
     shape = 21,
@@ -1136,28 +1350,39 @@ conus_map <- ggplot() +
     stroke = 0.6
   ) +
   
-  # Reservoir labels
   geom_text_repel(
     data = dam_info,
+    
     aes(
       x = Longitude,
       y = Latitude,
       label = Dam_Label
     ),
+    
     size = 3.1,
     fontface = "bold",
     color = "black",
     seed = 123,
+    
     box.padding = 0.45,
     point.padding = 0.25,
     min.segment.length = 0,
+    
     segment.color = "grey35",
     segment.size = 0.3
   ) +
   
   coord_sf(
-    xlim = c(-125, -66),
-    ylim = c(24, 50),
+    xlim = c(
+      -125,
+      -66
+    ),
+    
+    ylim = c(
+      24,
+      50
+    ),
+    
     expand = FALSE
   ) +
   
@@ -1166,102 +1391,131 @@ conus_map <- ggplot() +
   ) +
   
   theme(
-    panel.border = element_rect(
-      color = "black",
-      fill = NA,
-      linewidth = 0.5
-    ),
-    plot.margin = margin(
-      t = 5,
-      r = 5,
-      b = 5,
-      l = 5
-    )
+    
+    panel.border =
+      element_rect(
+        color = "black",
+        fill = NA,
+        linewidth = 0.5
+      ),
+    
+    plot.margin =
+      margin(
+        5,
+        5,
+        5,
+        5
+      )
   )
 
-# Save standalone CONUS map
+# ============================================================
+# Save CONUS map
+# ============================================================
+
 ggsave(
+  
   filename = file.path(
     output_dir,
     "CONUS_four_dam_locations_NCA.tiff"
   ),
+  
   plot = conus_map,
+  
   width = 7,
   height = 4.5,
+  
   units = "in",
   dpi = 600,
+  
   compression = "lzw",
+  
   bg = "white"
 )
 
 # ============================================================
-# 9. Journal-style theme
+# Journal theme
 # ============================================================
 
 journal_theme <- theme_minimal(
+  
   base_size = 9,
+  
   base_family = "sans"
+  
 ) +
+  
   theme(
     
-    plot.title = element_text(
-      face = "bold",
-      size = 10,
-      hjust = 0
-    ),
+    plot.title =
+      element_text(
+        face = "bold",
+        size = 10,
+        hjust = 0
+      ),
     
-    plot.subtitle = element_text(
-      size = 8,
-      color = "grey25",
-      hjust = 0
-    ),
+    plot.subtitle =
+      element_text(
+        size = 8,
+        color = "grey25",
+        hjust = 0
+      ),
     
-    axis.title = element_text(
-      face = "bold",
-      size = 9
-    ),
+    axis.title =
+      element_text(
+        face = "bold",
+        size = 9
+      ),
     
-    axis.text = element_text(
-      color = "black",
-      size = 7.5
-    ),
+    axis.text =
+      element_text(
+        color = "black",
+        size = 7.5
+      ),
     
-    axis.ticks = element_line(
-      color = "black",
-      linewidth = 0.3
-    ),
+    axis.ticks =
+      element_line(
+        color = "black",
+        linewidth = 0.3
+      ),
     
-    panel.grid.major = element_line(
-      color = "grey85",
-      linewidth = 0.3
-    ),
+    panel.grid.major =
+      element_line(
+        color = "grey85",
+        linewidth = 0.3
+      ),
     
-    panel.grid.minor = element_blank(),
+    panel.grid.minor =
+      element_blank(),
     
-    panel.border = element_rect(
-      color = "black",
-      fill = NA,
-      linewidth = 0.45
-    ),
+    panel.border =
+      element_rect(
+        color = "black",
+        fill = NA,
+        linewidth = 0.45
+      ),
     
-    legend.position = "bottom",
+    legend.position =
+      "bottom",
     
-    legend.title = element_blank(),
+    legend.title =
+      element_blank(),
     
-    legend.text = element_text(
-      size = 7.5
-    ),
+    legend.text =
+      element_text(
+        size = 7.5
+      ),
     
-    plot.margin = margin(
-      t = 4,
-      r = 6,
-      b = 4,
-      l = 6
-    )
+    plot.margin =
+      margin(
+        4,
+        6,
+        4,
+        6
+      )
   )
 
 # ============================================================
-# 10. Create four-panel figure for one reservoir
+# Create four-panel reservoir figure
 # ============================================================
 
 create_dam_figure <- function(
@@ -1270,50 +1524,42 @@ create_dam_figure <- function(
     dam_label
 ) {
   
-  # ==========================================================
-  # Panel (a):
-  # Mean monthly inflow volume and average monthly flow
-  # ==========================================================
+  # ----------------------------------------------------------
+  # Panel (a)
+  # 1970–2020 inflows
+  # ----------------------------------------------------------
   
-  seasonal_inflows <- result$Average_Monthly_Inflows %>%
-    arrange(Month_Number) %>%
+  seasonal_inflows <-
+    result$Average_Monthly_Inflows %>%
+    
+    arrange(
+      Month_Number
+    ) %>%
+    
     mutate(
-      Month_Number = as.numeric(Month_Number)
+      Month_Number =
+        as.numeric(
+          Month_Number
+        )
     )
   
-  # ----------------------------------------------------------
-  # Inflow record period
-  # ----------------------------------------------------------
-  
   record_start <- format(
-    min(
-      result$Monthly_Inflows$Month_Date,
-      na.rm = TRUE
-    ),
+    result$Inflow_Record_Start,
     "%Y"
   )
   
   record_end <- format(
-    max(
-      result$Monthly_Inflows$Month_Date,
-      na.rm = TRUE
-    ),
+    result$Inflow_Record_End,
     "%Y"
   )
   
-  # ----------------------------------------------------------
-  # Secondary-axis transformation
-  #
-  # Primary axis:
-  #   Mean monthly inflow volume, MCM
-  #
-  # Secondary axis:
-  #   Average monthly flow, m3/s
-  # ----------------------------------------------------------
+  total_values <-
+    seasonal_inflows$
+    Mean_Monthly_Total_MCM
   
-  total_values <- seasonal_inflows$Mean_Monthly_Total_MCM
-  
-  flow_values <- seasonal_inflows$Mean_Monthly_Flow
+  flow_values <-
+    seasonal_inflows$
+    Mean_Monthly_Flow
   
   total_range <- range(
     total_values,
@@ -1325,133 +1571,198 @@ create_dam_figure <- function(
     na.rm = TRUE
   )
   
-  total_span <- diff(total_range)
+  total_span <-
+    diff(total_range)
   
-  flow_span <- diff(flow_range)
+  flow_span <-
+    diff(flow_range)
   
-  if (!is.finite(total_span) || total_span == 0) {
+  if (
+    !is.finite(total_span) ||
+    total_span == 0
+  ) {
+    
     total_span <- 1
   }
   
-  if (!is.finite(flow_span) || flow_span == 0) {
+  if (
+    !is.finite(flow_span) ||
+    flow_span == 0
+  ) {
+    
     flow_span <- 1
   }
   
-  axis_multiplier <- total_span /
+  axis_multiplier <-
+    total_span /
     flow_span
   
-  axis_intercept <- total_range[1] -
+  axis_intercept <-
+    total_range[1] -
     axis_multiplier *
     flow_range[1]
   
-  seasonal_inflows <- seasonal_inflows %>%
+  seasonal_inflows <-
+    seasonal_inflows %>%
+    
     mutate(
+      
       Flow_Primary_Scale =
         axis_intercept +
         axis_multiplier *
         Mean_Monthly_Flow
     )
   
-  # ----------------------------------------------------------
-  # Panel (a)
-  # ----------------------------------------------------------
-  
   p_a <- ggplot(
+    
     seasonal_inflows,
+    
     aes(
       x = Month_Number
     )
+    
   ) +
     
-    # Blue bars: mean monthly total inflow volume
     geom_col(
+      
       aes(
-        y = Mean_Monthly_Total_MCM,
-        fill = "Mean monthly inflow volume"
+        y =
+          Mean_Monthly_Total_MCM,
+        
+        fill =
+          "Mean monthly inflow volume"
       ),
+      
       width = 0.72,
       alpha = 0.62,
+      
       color = "#2166AC",
       linewidth = 0.2
     ) +
     
-    # Orange line: average monthly flow
     geom_line(
+      
       aes(
-        y = Flow_Primary_Scale,
-        color = "Average monthly flow"
+        y =
+          Flow_Primary_Scale,
+        
+        color =
+          "Average monthly flow"
       ),
+      
       linewidth = 1.0,
-      lineend = "round"
+      
+      lineend =
+        "round"
     ) +
     
     geom_point(
+      
       aes(
-        y = Flow_Primary_Scale,
-        color = "Average monthly flow"
+        y =
+          Flow_Primary_Scale,
+        
+        color =
+          "Average monthly flow"
       ),
+      
       size = 1.7
     ) +
     
     scale_fill_manual(
+      
       values = c(
-        "Mean monthly inflow volume" = "#2166AC"
+        
+        "Mean monthly inflow volume" =
+          "#2166AC"
       )
     ) +
     
     scale_color_manual(
+      
       values = c(
-        "Average monthly flow" = "#D55E00"
+        
+        "Average monthly flow" =
+          "#009E73"
       )
     ) +
     
     scale_x_continuous(
+      
       breaks = 1:12,
-      labels = month.abb,
-      limits = c(0.5, 12.5),
-      expand = c(0, 0)
+      
+      labels =
+        month.abb,
+      
+      limits =
+        c(
+          0.5,
+          12.5
+        ),
+      
+      expand =
+        c(
+          0,
+          0
+        )
     ) +
     
     scale_y_continuous(
       
-      name = "Mean monthly inflow volume (MCM)",
+      name =
+        "Mean monthly inflow volume (MCM)",
       
-      labels = label_number(
-        accuracy = 1,
-        big.mark = ","
-      ),
-      
-      expand = expansion(
-        mult = c(0.03, 0.08)
-      ),
-      
-      sec.axis = sec_axis(
-        
-        trans = ~ (
-          . - axis_intercept
-        ) / axis_multiplier,
-        
-        name = expression(
-          "Average monthly flow (" *
-            m^3 * s^{-1} * ")"
-        ),
-        
-        labels = label_number(
+      labels =
+        label_number(
           accuracy = 1,
           big.mark = ","
+        ),
+      
+      expand =
+        expansion(
+          mult =
+            c(
+              0.03,
+              0.08
+            )
+        ),
+      
+      sec.axis =
+        sec_axis(
+          
+          trans =
+            ~ (
+              . -
+                axis_intercept
+            ) /
+            axis_multiplier,
+          
+          name =
+            expression(
+              "Average monthly flow (" *
+                m^3 ~ s^{-1} *
+                ")"
+            ),
+          
+          labels =
+            label_number(
+              accuracy = 1,
+              big.mark = ","
+            )
         )
-      )
     ) +
     
     labs(
-      title = "(a) Mean monthly inflow volume and flow",
-      subtitle = paste0(
-        "Inflow record: ",
-        record_start,
-        "\u2013",
-        record_end
-      ),
-      x = "Month",
+      
+      title =
+        "(a) Mean monthly inflow volume and flow",
+      
+      subtitle =
+        "Inflow record: 1970–2020",
+      
+      x =
+        "Month",
+      
       fill = NULL,
       color = NULL
     ) +
@@ -1459,340 +1770,645 @@ create_dam_figure <- function(
     journal_theme +
     
     theme(
-      axis.title.y.left = element_text(
-        color = "#2166AC",
-        face = "bold"
-      ),
       
-      axis.text.y.left = element_text(
-        color = "#2166AC"
-      ),
+      axis.title.y.left =
+        element_text(
+          color = "#2166AC",
+          face = "bold"
+        ),
       
-      axis.title.y.right = element_text(
-        color = "#D55E00",
-        face = "bold"
-      ),
+      axis.text.y.left =
+        element_text(
+          color = "#2166AC"
+        ),
       
-      axis.text.y.right = element_text(
-        color = "#D55E00"
-      ),
+      axis.title.y.right =
+        element_text(
+          color = "#009E73",
+          face = "bold"
+        ),
       
-      legend.position = "bottom",
-      
-      legend.text = element_text(
-        size = 7.5
-      )
+      axis.text.y.right =
+        element_text(
+          color = "#009E73"
+        )
     )
   
-  # ==========================================================
-  # Panel (b): Monthly release policy only
-  # ==========================================================
+  # ----------------------------------------------------------
+  # Panel (b)
+  # Monthly storage target
+  # ----------------------------------------------------------
   
   p_b <- ggplot(
+    
     result$Monthly_Targets,
-    aes(
-      x = Month_Number,
-      y = Target_Release
-    )
-  ) +
     
-    geom_step(
-      direction = "mid",
-      color = "#B8860B",
-      linewidth = 1.0
-    ) +
-    
-    geom_point(
-      color = "#B8860B",
-      size = 1.5
-    ) +
-    
-    scale_x_continuous(
-      breaks = 1:12,
-      labels = month.abb,
-      limits = c(0.5, 12.5),
-      expand = c(0, 0)
-    ) +
-    
-    scale_y_continuous(
-      labels = label_number(
-        accuracy = 1,
-        big.mark = ","
-      ),
-      expand = expansion(
-        mult = c(0.04, 0.10)
-      )
-    ) +
-    
-    labs(
-      title = "(b) Monthly release policy",
-      x = "Month",
-      y = expression(
-        "Release policy (" *
-          m^3 * s^{-1} * ")"
-      )
-    ) +
-    
-    journal_theme
-  
-  # ==========================================================
-  # Panel (c): Monthly target storage
-  # ==========================================================
-  
-  p_c <- ggplot(
-    result$Monthly_Targets,
     aes(
       x = Month_Number,
       y = Target_Storage
     )
+    
   ) +
     
-    geom_step(
-      direction = "mid",
+    geom_line(
+      
       color = "#762A83",
-      linewidth = 0.9
+      
+      linewidth = 1.0
     ) +
     
     geom_point(
+      
       color = "#762A83",
+      
       size = 1.5
     ) +
     
     scale_x_continuous(
+      
       breaks = 1:12,
-      labels = month.abb,
-      limits = c(0.5, 12.5),
-      expand = c(0, 0)
+      
+      labels =
+        month.abb,
+      
+      limits =
+        c(
+          0.5,
+          12.5
+        ),
+      
+      expand =
+        c(
+          0,
+          0
+        )
     ) +
     
     scale_y_continuous(
-      labels = label_number(
-        accuracy = 0.1,
-        big.mark = ","
-      ),
-      expand = expansion(
-        mult = c(0.04, 0.10)
-      )
+      
+      labels =
+        label_number(
+          accuracy = 0.1,
+          big.mark = ","
+        ),
+      
+      expand =
+        expansion(
+          mult =
+            c(
+              0.04,
+              0.10
+            )
+        )
     ) +
     
     labs(
-      title = "(c) Monthly target storage",
-      x = "Month",
-      y = "Target storage (MCM)"
+      
+      title =
+        "(b) Monthly storage target",
+      
+      x =
+        "Month",
+      
+      y =
+        "Storage target (MCM)"
     ) +
     
     journal_theme
   
-  # ==========================================================
-  # Panel (d): Monthly target elevation
-  # ==========================================================
+  # ----------------------------------------------------------
+  # Panel (c)
+  # Daily release target
+  # ----------------------------------------------------------
+  
+  p_c <- ggplot(
+    
+    result$Targets,
+    
+    aes(
+      x = Reference_Date,
+      y = Target_Release
+    )
+    
+  ) +
+    
+    geom_line(
+      
+      color = "#D73027",
+      
+      linewidth = 0.8,
+      
+      na.rm = TRUE
+    ) +
+    
+    scale_x_date(
+      
+      breaks =
+        seq(
+          as.Date("2000-01-01"),
+          as.Date("2000-12-01"),
+          by = "1 month"
+        ),
+      
+      labels =
+        month.abb,
+      
+      limits =
+        c(
+          as.Date("1999-12-20"),
+          as.Date("2000-12-31")
+        ),
+      
+      expand =
+        c(
+          0,
+          0
+        )
+    ) +
+    
+    scale_y_continuous(
+      
+      labels =
+        label_number(
+          accuracy = 1,
+          big.mark = ","
+        ),
+      
+      expand =
+        expansion(
+          mult =
+            c(
+              0.04,
+              0.10
+            )
+        )
+    ) +
+    
+    labs(
+      
+      title =
+        "(c) Daily release target",
+      
+      x =
+        "Month",
+      
+      y =
+        expression(
+          "Release target (" *
+            m^3 ~ s^{-1} *
+            ")"
+        )
+    ) +
+    
+    journal_theme
+  
+  # ----------------------------------------------------------
+  # Target profile for panel (d)
+  # ----------------------------------------------------------
+  
+  target_release_plot <-
+    result$Targets %>%
+    
+    filter(
+      
+      !is.na(
+        Target_Release
+      ),
+      
+      !is.na(
+        Target_X
+      )
+    ) %>%
+    
+    arrange(
+      Day
+    )
+  
+  # ----------------------------------------------------------
+  # Panel (d)
+  # 1970–2020 observed releases
+  # ----------------------------------------------------------
+  
+  outflow_start <- format(
+    result$Outflow_Record_Start,
+    "%Y"
+  )
+  
+  outflow_end <- format(
+    result$Outflow_Record_End,
+    "%Y"
+  )
   
   p_d <- ggplot(
-    result$Monthly_Targets,
+    
+    result$Outflows,
+    
     aes(
       x = Month_Number,
-      y = Target_Elevation
+      y = Outflow
     )
+    
   ) +
     
-    geom_step(
-      direction = "mid",
-      color = "#008837",
-      linewidth = 0.9
-    ) +
-    
-    geom_point(
-      color = "#008837",
-      size = 1.5
-    ) +
-    
-    scale_x_continuous(
-      breaks = 1:12,
-      labels = month.abb,
-      limits = c(0.5, 12.5),
-      expand = c(0, 0)
-    ) +
-    
-    scale_y_continuous(
-      labels = label_number(
-        accuracy = 0.1
+    geom_boxplot(
+      
+      aes(
+        group =
+          Month_Number,
+        
+        fill =
+          "Observed daily releases"
       ),
-      expand = expansion(
-        mult = c(0.04, 0.10)
+      
+      width = 0.58,
+      
+      color = "grey25",
+      
+      linewidth = 0.45,
+      
+      outlier.size = 0.7,
+      
+      outlier.alpha = 0.40
+    ) +
+    
+    geom_line(
+      
+      data =
+        target_release_plot,
+      
+      aes(
+        
+        x =
+          Target_X,
+        
+        y =
+          Target_Release,
+        
+        color =
+          "Daily release target"
+      ),
+      
+      linewidth = 0.9,
+      
+      inherit.aes = FALSE
+    ) +
+    
+    scale_fill_manual(
+      
+      name = NULL,
+      
+      values = c(
+        
+        "Observed daily releases" =
+          "grey80"
       )
     ) +
     
-    labs(
-      title = "(d) Monthly target elevation",
-      x = "Month",
-      y = "Target elevation (m)"
+    scale_color_manual(
+      
+      name = NULL,
+      
+      values = c(
+        
+        "Daily release target" =
+          "#D73027"
+      )
     ) +
     
-    journal_theme
+    scale_x_continuous(
+      
+      breaks = 1:12,
+      
+      labels =
+        month.abb,
+      
+      limits =
+        c(
+          0.5,
+          12.5
+        ),
+      
+      expand =
+        c(
+          0,
+          0
+        )
+    ) +
+    
+    scale_y_continuous(
+      
+      labels =
+        label_number(
+          accuracy = 1,
+          big.mark = ","
+        ),
+      
+      expand =
+        expansion(
+          mult =
+            c(
+              0.04,
+              0.10
+            )
+        )
+    ) +
+    
+    labs(
+      
+      title =
+        "(d) Observed releases and target profile",
+      
+      subtitle =
+        paste0(
+          "Observed record: 1970–2020",
+          " | n = ",
+          comma(
+            result$Outflow_N
+          )
+        ),
+      
+      x =
+        "Month",
+      
+      y =
+        expression(
+          "Release (" *
+            m^3 ~ s^{-1} *
+            ")"
+        )
+    ) +
+    
+    journal_theme +
+    
+    theme(
+      
+      legend.position =
+        "bottom",
+      
+      legend.direction =
+        "horizontal",
+      
+      legend.box =
+        "horizontal",
+      
+      legend.margin =
+        margin(
+          t = 2,
+          r = 0,
+          b = 0,
+          l = 0
+        ),
+      
+      legend.text =
+        element_text(
+          size = 8
+        ),
+      
+      legend.key =
+        element_rect(
+          fill = "white",
+          color = NA
+        )
+    )
   
-  # ==========================================================
-  # Highlight the correct reservoir on the map
-  # ==========================================================
+  # ----------------------------------------------------------
+  # Highlight selected reservoir on map
+  # ----------------------------------------------------------
   
-  selected_dam <- dam_points %>%
+  selected_dam <-
+    dam_points %>%
+    
     filter(
       Dam_ID == dam_id
     )
   
-  map_for_dam <- conus_map +
+  map_for_dam <-
+    conus_map +
     
     geom_sf(
-      data = selected_dam,
+      
+      data =
+        selected_dam,
+      
       shape = 21,
-      fill = "#D73027",
-      color = "black",
-      size = 5,
-      stroke = 0.8
+      
+      fill =
+        "#D73027",
+      
+      color =
+        "black",
+      
+      size =
+        5,
+      
+      stroke =
+        0.8
     )
   
-  # ==========================================================
-  # Arrange analytical panels
-  # ==========================================================
+  # ----------------------------------------------------------
+  # Combine analytical panels
+  # ----------------------------------------------------------
   
   analytical_panels <- (
-    p_a | p_b
-  ) /
-    (
-      p_c | p_d
-    )
-  
-  # ==========================================================
-  # Combine map and analytical panels
-  # ==========================================================
-  
-  final_figure <- (
-    map_for_dam |
-      analytical_panels
-  ) +
     
-    plot_layout(
-      widths = c(0.85, 2.60)
+    p_a | p_b
+    
+  ) / (
+    
+    p_c | p_d
+    
+  )
+  
+  # ----------------------------------------------------------
+  # Final figure
+  # ----------------------------------------------------------
+  
+  final_figure <-
+    
+    (
+      
+      map_for_dam |
+        analytical_panels
+      
     ) +
     
-    plot_annotation(
-      title = paste0(
-        dam_label,
-        " Reservoir: inflows and operational targets"
-      ),
-      theme = theme(
-        plot.title = element_text(
-          face = "bold",
-          size = 13,
-          hjust = 0.5,
-          margin = margin(
-            b = 8
-          )
+    plot_layout(
+      
+      widths =
+        c(
+          0.85,
+          2.60
         )
-      )
     )
   
   final_figure
 }
 
 # ============================================================
-# 11. Generate and save each reservoir figure
+# Generate figures for all four reservoirs
 # ============================================================
 
-dam_figures <- list()
-
-for (i in seq_len(nrow(dam_info))) {
+dam_figures <- setNames(
   
-  dam_id <- dam_info$Dam_ID[i]
-  
-  dam_label <- dam_info$Dam_Label[i]
-  
-  message(
-    "\nCreating figure for ",
-    dam_label,
-    "..."
-  )
-  
-  dam_figures[[dam_id]] <- create_dam_figure(
-    result = dam_results[[dam_id]],
-    dam_id = dam_id,
-    dam_label = dam_label
-  )
-  
-  file_stub <- paste0(
-    dam_id,
-    "_inflows_targets"
-  )
-  
-  # ----------------------------------------------------------
-  # Save TIFF at 600 dpi
-  # ----------------------------------------------------------
-  
-  ggsave(
-    filename = file.path(
-      output_dir,
-      paste0(
-        file_stub,
-        ".tiff"
-      )
+  lapply(
+    
+    seq_len(
+      nrow(dam_info)
     ),
-    plot = dam_figures[[dam_id]],
-    width = 12,
-    height = 8,
-    units = "in",
-    dpi = 600,
-    compression = "lzw",
-    bg = "white"
-  )
-  
-  # ----------------------------------------------------------
-  # Save vector PDF
-  # ----------------------------------------------------------
-  
-  ggsave(
-    filename = file.path(
-      output_dir,
-      paste0(
-        file_stub,
-        ".pdf"
+    
+    function(i) {
+      
+      dam_id <-
+        dam_info$Dam_ID[i]
+      
+      dam_label <-
+        dam_info$Dam_Label[i]
+      
+      figure <-
+        create_dam_figure(
+          
+          result =
+            dam_results[[dam_id]],
+          
+          dam_id =
+            dam_id,
+          
+          dam_label =
+            dam_label
+        )
+      
+      file_stub <-
+        paste0(
+          dam_id,
+          "_inflows_storage_release_outflows"
+        )
+      
+      # ------------------------------------------------------
+      # TIFF
+      # ------------------------------------------------------
+      
+      ggsave(
+        
+        filename =
+          file.path(
+            output_dir,
+            paste0(
+              file_stub,
+              ".tiff"
+            )
+          ),
+        
+        plot =
+          figure,
+        
+        width =
+          12,
+        
+        height =
+          8,
+        
+        units =
+          "in",
+        
+        dpi =
+          600,
+        
+        compression =
+          "lzw",
+        
+        bg =
+          "white"
       )
-    ),
-    plot = dam_figures[[dam_id]],
-    width = 12,
-    height = 8,
-    units = "in",
-    device = cairo_pdf,
-    bg = "white"
-  )
-}
+      
+      # ------------------------------------------------------
+      # PDF
+      # ------------------------------------------------------
+      
+      ggsave(
+        
+        filename =
+          file.path(
+            output_dir,
+            paste0(
+              file_stub,
+              ".pdf"
+            )
+          ),
+        
+        plot =
+          figure,
+        
+        width =
+          12,
+        
+        height =
+          8,
+        
+        units =
+          "in",
+        
+        device =
+          cairo_pdf,
+        
+        bg =
+          "white"
+      )
+      
+      figure
+    }
+  ),
+  
+  dam_info$Dam_ID
+)
 
 # ============================================================
-# 12. Save all four figures as a multipage PDF
+# Combined PDF containing all four reservoirs
 # ============================================================
 
 all_dams_pdf <- file.path(
+  
   output_dir,
-  "All_four_dams_inflows_targets.pdf"
+  
+  "All_four_dams_inflows_storage_release_outflows.pdf"
 )
 
 pdf(
-  file = all_dams_pdf,
-  width = 12,
-  height = 8,
-  onefile = TRUE
+  
+  file =
+    all_dams_pdf,
+  
+  width =
+    12,
+  
+  height =
+    8,
+  
+  onefile =
+    TRUE
 )
 
-for (i in seq_len(nrow(dam_info))) {
+for (
+  figure in dam_figures
+) {
   
-  dam_id <- dam_info$Dam_ID[i]
-  
-  print(
-    dam_figures[[dam_id]]
-  )
+  print(figure)
 }
 
 dev.off()
 
+# ============================================================
+# Final message
+# ============================================================
+
 message(
-  "\nAll figures saved to:\n",
+  "Figures saved to: ",
   output_dir
+)
+
+message(
+  "Panels (a) and (d) use daily records from 1970–2020."
+)
+
+message(
+  "Panels (b) and (c) retain the 366-day WaDorule target series."
 )
